@@ -3789,3 +3789,2975 @@ public:
 
 - Customer 类：存储客户到达时间和业务处理时间；
 - 模拟核心：循环模拟每分钟的客户到达、业务处理、队列管理，统计等待时间、被拒绝客户数等指标。
+
+# 十一、类继承
+
+## 1. 继承的基础概念与简单实现
+
+### 核心定义
+
+- **基类（父类）**：被继承的已有类，提供通用的属性和方法（如`TableTennisPlayer`）；
+- **派生类（子类）**：基于基类扩展的新类，继承基类的成员并可新增专属成员（如`RatedPlayer`）；
+- **公有继承**：最常用的继承方式，建立**is-a 关系**（派生类对象也是基类对象），基类的公有成员成为派生类的公有成员，私有成员仅能通过基类方法访问。
+
+### 派生类的定义语法
+
+```c++
+// 派生类声明：公有继承基类
+class 派生类名 : public 基类名 {
+private:
+    // 新增私有成员
+public:
+    // 新增公有成员/重写基类方法
+    // 派生类构造函数
+};
+```
+
+### 派生类的构造函数
+
+派生类不能直接访问基类的私有成员，需通过**成员初始化列表**调用基类构造函数初始化继承的成员，再初始化自身新增成员。
+
+#### 示例：`RatedPlayer`类构造函数
+
+```C++
+// 基类：TableTennisPlayer
+class TableTennisPlayer {
+private:
+    string firstname;
+    string lastname;
+    bool hasTable;
+public:
+    // 基类构造函数
+    TableTennisPlayer(const string &fn, const string &ln, bool ht) 
+        : firstname(fn), lastname(ln), hasTable(ht) {}
+};
+
+// 派生类：RatedPlayer
+class RatedPlayer : public TableTennisPlayer {
+private:
+    unsigned int rating; // 新增成员：排名
+public:
+    // 派生类构造函数：成员初始化列表调用基类构造函数
+    RatedPlayer(unsigned int r, const string &fn, const string &ln, bool ht)
+        : TableTennisPlayer(fn, ln, ht), rating(r) {}
+
+    // 派生类构造函数：用基类对象初始化
+    RatedPlayer(unsigned int r, const TableTennisPlayer &tp)
+        : TableTennisPlayer(tp), rating(r) {}
+};
+```
+
+#### 构造函数调用顺序
+
+1. 先调用**基类构造函数**（通过初始化列表指定，未指定则调用默认构造函数）；
+2. 再执行**派生类构造函数体**，初始化新增成员。
+
+### 派生类与基类的特殊关系
+
+1. 派生类对象可使用基类方法（基类公有 / 保护成员）：
+
+   ```C++
+   RatedPlayer rplayer(1140, "Mallory", "Duck", true);
+   rplayer.Name(); // 调用基类TableTennisPlayer的Name()方法
+   ```
+
+2. 基类指针 / 引用可指向派生类对象（无需显式转换）：
+
+   ```C++
+   TableTennisPlayer *pt = &rplayer; // 基类指针指向派生类对象
+   TableTennisPlayer &rt = rplayer;  // 基类引用引用派生类对象
+   ```
+
+   - 限制：基类指针 / 引用仅能调用基类方法，无法访问派生类新增成员；
+
+3. 禁止派生类指针 / 引用指向基类对象（需显式转换，且存在风险）：
+
+   ```C++
+   TableTennisPlayer player("Betsy", "Bloop", true);
+   RatedPlayer *pr = &player; // 错误：不允许隐式转换
+   ```
+
+## 2. is-a 关系：公有继承的设计原则
+
+公有继承的核心是遵循**is-a 关系**—— 派生类对象是基类对象的特殊形式，对基类对象合法的操作，对派生类对象也合法。
+
+### 符合 is-a 关系的场景
+
+- 圆（`Circle`）是椭圆（`Ellipse`）的特例：可从`Ellipse`派生出`Circle`；
+- 支票账户（`Brass`）与透支账户（`BrassPlus`）：`BrassPlus`是具备透支功能的`Brass`，符合 is-a 关系。
+
+### 不符合 is-a 关系的场景（禁止公有继承）
+
+- **has-a 关系**（有一个）：午餐（`Lunch`）包含水果（`Fruit`），应将`Fruit`作为`Lunch`的成员，而非继承；
+- **is-like-a 关系**（像一个）：律师（`Lawyer`）像鲨鱼（`Shark`），但律师不是鲨鱼，不应继承；
+- **is-implemented-as-a 关系**（作为... 实现）：栈（`Stack`）用数组（`Array`）实现，应将数组作为私有成员，而非继承。
+
+## 3. 多态公有继承：虚函数与动态联编
+
+多态的核心是 “同一方法在不同类中有不同行为”，通过**虚函数**和**动态联编**实现。
+
+### 虚函数的定义与使用
+
+在基类中用`virtual`关键字声明方法，派生类可重写该方法，调用时根据对象实际类型选择对应版本。
+
+#### 示例：银行账户类的多态实现
+
+```C++
+// 基类：Brass（普通支票账户）
+class Brass {
+public:
+    // 虚方法：可被派生类重写
+    virtual void Withdraw(double amt) {
+        if (amt <= balance) balance -= amt;
+        else cout << "余额不足" << endl;
+    }
+    virtual void ViewAcct() const { /* 显示普通账户信息 */ }
+    virtual ~Brass() {} // 虚析构函数
+};
+
+// 派生类：BrassPlus（透支账户）
+class BrassPlus : public Brass {
+public:
+    // 重写基类虚方法
+    void Withdraw(double amt) override { // C++11 override显式声明重写
+        double bal = Balance();
+        if (amt <= bal) {
+            Brass::Withdraw(amt); // 调用基类方法
+        } else if (amt <= bal + maxLoan - owesBank) {
+            double advance = amt - bal;
+            owesBank += advance * (1.0 + rate); // 透支利息
+            Deposit(advance);
+            Brass::Withdraw(amt);
+        } else {
+            cout << "透支额度不足" << endl;
+        }
+    }
+    void ViewAcct() const override { /* 显示透支账户信息（含基类信息） */ }
+};
+```
+
+### 静态联编与动态联编
+
+- **静态联编（早期联编）**：编译时确定调用的方法版本，适用于非虚方法（根据指针 / 引用类型判断）；
+- **动态联编（晚期联编）**：运行时确定调用的方法版本，适用于虚方法（根据对象实际类型判断）。
+
+#### 联编行为对比
+
+```
+Brass dom("Dominic", 11224, 4183.45);
+BrassPlus dot("Dorothy", 12118, 2592.00);
+Brass &b1 = dom;
+Brass &b2 = dot;
+
+b1.ViewAcct(); // 静态联编：调用Brass::ViewAcct()
+b2.ViewAcct(); // 动态联编：调用BrassPlus::ViewAcct()（因ViewAcct是虚方法）
+```
+
+### 虚函数的工作原理
+
+编译器通过**虚函数表（vtbl）** 实现动态联编：
+
+1. 每个包含虚函数的类有一个 vtbl，存储该类所有虚函数的地址；
+2. 每个对象包含一个隐藏的`vptr`指针，指向所属类的 vtbl；
+3. 调用虚函数时，通过`vptr`找到 vtbl，根据方法索引调用对应地址的函数。
+
+#### 虚函数的内存开销
+
+- 每个对象增大：增加一个`vptr`指针的存储空间；
+- 每个类增加：一个 vtbl 数组（存储虚函数地址）；
+- 调用开销：多一次指针间接访问（从 vtbl 查找函数地址）。
+
+### 虚函数的关键规则
+
+1. **构造函数不能是虚函数**：构造函数执行时对象尚未完全创建，无法动态联编；
+
+2. **析构函数应是虚函数**：确保删除派生类对象时，先调用派生类析构函数，再调用基类析构函数，避免内存泄漏；
+
+   ```C++
+   Brass *p = new BrassPlus("Tom", 12345, 1000);
+   delete p; // 若基类析构函数是虚的，会调用BrassPlus::~BrassPlus() + Brass::~Brass()
+   ```
+
+3. **友元不能是虚函数**：友元不是类成员，无`this`指针，无法关联 vtbl；
+
+4. **重写需匹配原型**：派生类重写虚函数时，函数名、参数列表、返回类型必须与基类一致（返回类型协变除外：基类返回基类指针 / 引用，派生类可返回派生类指针 / 引用）；
+
+5. **未重写的虚函数**：派生类将继承基类的虚函数版本。
+
+## 4. 访问控制：protected 关键字
+
+`protected`关键字用于控制基类成员的访问权限，平衡封装性和派生类的访问需求。
+
+### 访问权限对比
+
+| 访问修饰符 | 类内 | 派生类内 | 类外 |
+| :--------: | :--: | :------: | :--: |
+|  private   |  是  |    否    |  否  |
+| protected  |  是  |    是    |  否  |
+|   public   |  是  |    是    |  是  |
+
+### protected 的使用场景与风险
+
+- **适用场景**：基类的辅助方法或需被派生类直接访问的成员（如计算中间结果的方法）；
+- **风险**：破坏封装性，派生类可能直接修改基类 protected 成员，导致基类设计的约束失效；
+- **最佳实践**：优先使用`private`成员，通过基类公有 / 保护方法提供访问，仅在必要时使用`protected`。
+
+## 5. 抽象基类（ABC）与纯虚函数
+
+抽象基类（ABC）是仅定义接口、不提供具体实现的类，用于统一派生类的接口规范，通过**纯虚函数**实现。
+
+### 纯虚函数的定义
+
+在虚函数声明后加`=0`，表示该函数无默认实现，派生类必须重写才能实例化。
+
+```C++
+class 抽象基类名 {
+public:
+    virtual 返回类型 纯虚函数名(参数列表) = 0; // 纯虚函数
+};
+```
+
+### ABC 的特征
+
+- 不能直接创建 ABC 的对象（仅作为基类）；
+- 派生类必须重写所有纯虚函数，否则仍为 ABC；
+- 作用：定义通用接口，强制派生类遵循统一规范（如`BaseEllipse`作为`Ellipse`和`Circle`的 ABC）。
+
+#### 示例：图形 ABC 与具体图形类
+
+```C++
+// 抽象基类：BaseEllipse（椭圆基类）
+class BaseEllipse {
+private:
+    double x, y; // 中心坐标
+public:
+    BaseEllipse(double x0 = 0, double y0 = 0) : x(x0), y(y0) {}
+    virtual double Area() const = 0; // 纯虚函数：计算面积
+    virtual void Move(int nx, int ny) { x = nx; y = ny; }
+};
+
+// 具体类：Ellipse（椭圆）
+class Ellipse : public BaseEllipse {
+private:
+    double a, b; // 长半轴、短半轴
+public:
+    double Area() const override { return 3.14159 * a * b; } // 重写纯虚函数
+};
+
+// 具体类：Circle（圆）
+class Circle : public BaseEllipse {
+private:
+    double r; // 半径
+public:
+    double Area() const override { return 3.14159 * r * r; } // 重写纯虚函数
+};
+```
+
+### ABC 的应用场景
+
+- 设计组件接口（如银行账户 ABC`AcctABC`，派生`Brass`和`BrassPlus`）；
+
+- 实现多态数组（用 ABC 指针数组管理不同派生类对象）：
+
+  ```C++
+  BaseEllipse *shapes[2];
+  shapes[0] = new Ellipse(0, 0, 3, 2);
+  shapes[1] = new Circle(1, 1, 2);
+  for (int i = 0; i < 2; i++) {
+      cout << "面积：" << shapes[i]->Area() << endl; // 动态联编
+  }
+  ```
+
+## 6. 继承与动态内存分配
+
+当基类或派生类使用`new`分配动态内存时，需特殊处理复制构造函数、赋值运算符和析构函数，避免浅复制和内存泄漏。
+
+### 场景 1：基类使用动态内存，派生类不使用
+
+- 派生类无需显式定义析构函数、复制构造函数、赋值运算符；
+- 编译器生成的默认版本会自动调用基类的对应方法，处理继承的动态内存成员。
+
+#### 示例：基类`baseDMA`与派生类`lacksDMA`
+
+```C++
+// 基类：使用动态内存
+class baseDMA {
+private:
+    char *label; // 动态分配字符串
+public:
+    baseDMA(const char *l = "null") {
+        label = new char[strlen(l) + 1];
+        strcpy(label, l);
+    }
+    // 显式复制构造函数（深复制）
+    baseDMA(const baseDMA &rs) {
+        label = new char[strlen(rs.label) + 1];
+        strcpy(label, rs.label);
+    }
+    // 显式赋值运算符（深复制）
+    baseDMA &operator=(const baseDMA &rs) {
+        if (this == &rs) return *this;
+        delete[] label;
+        label = new char[strlen(rs.label) + 1];
+        strcpy(label, rs.label);
+        return *this;
+    }
+    ~baseDMA() { delete[] label; }
+};
+
+// 派生类：不使用动态内存
+class lacksDMA : public baseDMA {
+private:
+    char color[40]; // 固定大小数组
+public:
+    // 无需显式定义析构函数、复制构造函数、赋值运算符
+};
+```
+
+### 场景 2：基类和派生类都使用动态内存
+
+- 派生类必须显式定义析构函数、复制构造函数、赋值运算符；
+- 需调用基类的对应方法处理继承的动态内存，再处理自身的动态内存。
+
+#### 示例：派生类`hasDMA`的实现
+
+```C++
+class hasDMA : public baseDMA {
+private:
+    char *style; // 动态分配字符串（新增成员）
+public:
+    // 构造函数：初始化列表调用基类构造函数
+    hasDMA(const char *s, const char *l) : baseDMA(l) {
+        style = new char[strlen(s) + 1];
+        strcpy(style, s);
+    }
+
+    // 复制构造函数：调用基类复制构造函数
+    hasDMA(const hasDMA &hs) : baseDMA(hs) {
+        style = new char[strlen(hs.style) + 1];
+        strcpy(style, hs.style);
+    }
+
+    // 赋值运算符：显式调用基类赋值运算符
+    hasDMA &operator=(const hasDMA &hs) {
+        if (this == &hs) return *this;
+        baseDMA::operator=(hs); // 调用基类赋值运算符（处理label）
+        delete[] style; // 释放自身原有动态内存
+        style = new char[strlen(hs.style) + 1];
+        strcpy(style, hs.style);
+        return *this;
+    }
+
+    // 析构函数：释放自身动态内存（基类析构函数自动调用）
+    ~hasDMA() { delete[] style; }
+};
+```
+
+### 继承中友元函数的处理
+
+友元函数不是类成员，无法继承，但若需访问基类的友元，可通过**强制类型转换**将派生类对象转为基类对象，调用基类友元。
+
+```C++
+// 基类友元函数
+ostream &operator<<(ostream &os, const baseDMA &rs) {
+    os << "Label: " << rs.label << endl;
+    return os;
+}
+
+// 派生类友元函数：调用基类友元
+ostream &operator<<(ostream &os, const hasDMA &hs) {
+    os << (const baseDMA &)hs; // 强制转换为基类对象，调用基类友元
+    os << "Style: " << hs.style << endl;
+    return os;
+}
+```
+
+## 7. 类继承设计回顾与最佳实践
+
+### 编译器生成的特殊成员函数
+
+|   函数类型   |        生成条件        |               默认行为                |            需显式定义的场景            |
+| :----------: | :--------------------: | :-----------------------------------: | :------------------------------------: |
+| 默认构造函数 |   未定义任何构造函数   | 调用基类默认构造函数 + 成员默认初始化 |  需初始化成员（如指针设为`nullptr`）   |
+| 复制构造函数 | 未显式定义，且程序使用 |        成员逐值复制（浅复制）         | 类包含动态内存成员、静态成员需同步更新 |
+|  赋值运算符  | 未显式定义，且程序使用 |        成员逐值赋值（浅复制）         |   类包含动态内存成员、需避免自我赋值   |
+|   析构函数   |       未显式定义       |           调用基类析构函数            |  类包含动态内存成员、基类为虚析构函数  |
+
+### 公有继承的核心设计原则
+
+- 严格遵循 is-a 关系，不滥用继承；
+
+- 基类的析构函数必须为虚函数（即使无动态内存）；
+
+- 仅将需被派生类重写的方法声明为虚函数；
+
+- 优先使用`private`成员，通过基类方法提供访问，慎用`protected`；
+
+- 派生类重写虚函数时，使用`override`显式声明（C++11），避免原型不匹配；
+
+- 传递对象时优先使用**const 引用**（提高效率、支持多态），避免按值传递（切片效应：仅复制基类部分）。
+
+# 十二、代码重用
+
+## 1. 组合（包含对象成员）：has-a 关系的核心实现
+
+**组合**（又称包含、层次化）是通过在类中包含其他类的对象作为成员来实现代码重用，核心是建立**has-a 关系**（新类 “拥有” 其他类的对象），是最常用、最安全的代码重用方式。
+
+### 组合的核心特征
+
+- 继承 “实现” 而非 “接口”：被包含对象的公有接口不会自动成为新类的接口，新类需通过自身方法封装被包含对象的操作；
+- 封装性更强：被包含对象的私有成员被严格隐藏，新类仅能通过其公有接口访问，避免意外修改；
+- 灵活性高：支持包含多个同类或不同类的对象，适配复杂场景（如一个`Home`类可包含多个`Room`对象）。
+
+### 组合类的设计与实现（Student 类示例）
+
+以 “学生（Student）包含姓名（string）和成绩（valarray<double>）” 为例，展示组合类的完整实现：
+
+#### 1. 类声明（studentc.h）
+
+```c++
+#include <string>
+#include <valarray>
+
+class Student {
+private:
+    std::string name;                // 包含string对象（姓名）
+    typedef std::valarray<double> ArrayDb;
+    ArrayDb scores;                  // 包含valarray<double>对象（成绩）
+    // 私有辅助方法：输出成绩
+    std::ostream& arr_out(std::ostream& os) const;
+public:
+    // 构造函数：初始化列表初始化包含的对象
+    Student() : name(""), scores() {}
+    explicit Student(const std::string& s) : name(s), scores() {}
+    explicit Student(int n) : name(""), scores(n) {}
+    Student(const std::string& s, int n) : name(s), scores(n) {}
+    Student(const std::string& s, const double* pd, int n) : name(s), scores(pd, n) {}
+    ~Student() {}
+
+    // 公有接口：封装被包含对象的操作
+    double Average() const;          // 计算平均分（调用scores.sum()和scores.size()）
+    const std::string& Name() const { return name; }
+    double& operator[](int i) { return scores[i]; }
+    const double& operator[](int i) const { return scores[i]; }
+
+    // 友元函数：输出学生信息
+    friend std::ostream& operator<<(std::ostream& os, const Student& stu);
+};
+```
+
+#### 2. 关键实现细节
+
+- **构造函数初始化列表**：必须通过初始化列表初始化被包含的对象（如`name(s)`调用 string 的构造函数），若省略则调用被包含对象的默认构造函数；
+- **封装被包含对象的接口**：`Average()`方法内部调用`scores.sum()`和`scores.size()`，隐藏 valarray 的实现细节；
+- **辅助方法**：`arr_out()`封装成绩输出逻辑，使友元函数更简洁。
+
+#### 3. 组合类的使用
+
+```c++
+Student ada(3); // 3门课程成绩
+ada[0] = 92;
+ada[1] = 89;
+ada[2] = 95;
+cout << ada.Name() << "的平均分：" << ada.Average() << endl;
+cout << ada; // 调用友元operator<<，输出姓名和成绩
+```
+
+### 组合的优势与适用场景
+
+- 优势：易于理解、封装性强、无继承带来的复杂问题（如二义性）、支持多对象包含；
+- 适用场景：新类与被包含类是 has-a 关系（如 “汽车有发动机”“学生有成绩”），需隐藏被包含类的接口，或需包含多个同类对象。
+
+## 2. 私有继承与保护继承：has-a 关系的补充实现
+
+私有继承（private inheritance）和保护继承（protected inheritance）是实现 has-a 关系的另一种方式，核心是将基类的成员 “融入” 派生类，但不暴露基类的接口，仅用于特定场景（如需访问基类保护成员或重写虚函数）。
+
+### 私有继承的核心规则
+
+- 基类的公有成员和保护成员均成为派生类的**私有成员**；
+- 派生类可在内部使用基类的方法，但基类接口不会成为派生类的公有接口；
+- 禁止隐式向上转换：基类指针 / 引用不能指向派生类对象（需显式转换，风险高）。
+
+### 私有继承的实现（Student 类重构）
+
+用私有继承重构 Student 类，继承`string`和`valarray<double>`：
+
+```c++
+class Student : private std::string, private std::valarray<double> {
+private:
+    typedef std::valarray<double> ArrayDb;
+    std::ostream& arr_out(std::ostream& os) const;
+public:
+    // 构造函数：初始化列表调用基类构造函数
+    Student() : std::string(""), ArrayDb() {}
+    explicit Student(const std::string& s) : std::string(s), ArrayDb() {}
+    explicit Student(int n) : std::string(""), ArrayDb(n) {}
+    Student(const std::string& s, int n) : std::string(s), ArrayDb(n) {}
+    Student(const std::string& s, const double* pd, int n) : std::string(s), ArrayDb(pd, n) {}
+    ~Student() {}
+
+    // 公有接口：通过基类名+作用域解析符调用基类方法
+    double Average() const { return size() > 0 ? sum() / size() : 0; }
+    const std::string& Name() const { return (const std::string&)*this; } // 强制转换为string对象
+    double& operator[](int i) { return ArrayDb::operator[](i); }
+    const double& operator[](int i) const { return ArrayDb::operator[](i); }
+
+    // 友元函数：显式转换为基类对象调用其接口
+    friend std::ostream& operator<<(std::ostream& os, const Student& stu);
+};
+```
+
+### 保护继承的特殊规则
+
+- 基类的公有成员和保护成员成为派生类的**保护成员**；
+- 与私有继承的核心区别：派生类的子类（第三代类）可访问基类的保护成员，而私有继承中基类成员对第三代类完全隐藏。
+
+### 组合与私有继承的选择
+
+|       特性       |              组合              |            私有继承            |
+| :--------------: | :----------------------------: | :----------------------------: |
+|    语法直观性    |    高（显式命名被包含对象）    |     低（隐式继承基类成员）     |
+|    多对象包含    | 支持（如包含多个 string 对象） | 不支持（仅能继承一个基类实例） |
+| 访问基类保护成员 |             不支持             |              支持              |
+|  重写基类虚函数  |             不支持             |              支持              |
+|      封装性      |    高（被包含对象边界清晰）    |    中（基类成员融入派生类）    |
+
+**选择原则**：
+
+- 优先使用组合（简单、安全、灵活）；
+- 仅当需要访问基类保护成员或重写基类虚函数时，使用私有 / 保护继承。
+
+### using 声明：重新开放基类接口
+
+私有 / 保护继承中，可通过`using`声明将基类的私有 / 保护成员重新开放为派生类的公有成员：
+
+```c++
+class Student : private std::valarray<double> {
+public:
+    using std::valarray<double>::min; // 开放valarray的min()方法
+    using std::valarray<double>::max; // 开放valarray的max()方法
+    using std::valarray<double>::operator[]; // 开放[]运算符
+};
+
+// 使用：
+Student ada(3);
+ada[0] = 92;
+cout << "最高分：" << ada.max() << endl; // 直接调用基类方法
+```
+
+## 3. 多重继承（MI）：多基类的代码重用
+
+多重继承（Multiple Inheritance）允许派生类同时继承多个基类，核心是组合多个基类的功能，建立复杂的继承关系（如`SingingWaiter`继承`Waiter`和`Singer`）。但 MI 易引发二义性和重复继承问题，需特殊规则解决。
+
+### 多重继承的声明与核心问题
+
+#### 1. 声明语法
+
+```c++
+// 公有多重继承（is-a关系）
+class SingingWaiter : public Waiter, public Singer {
+    // 派生类成员
+};
+```
+
+- 必须为每个基类显式指定继承方式（public/private/protected），默认私有继承；
+- 公有 MI 建立 “派生类是多个基类的特例” 关系（如`SingingWaiter`既是`Waiter`也是`Singer`）。
+
+#### 2. MI 的两大核心问题
+
+- **二义性**：多个基类有同名方法或成员时，未限定作用域会导致编译错误；
+- **重复继承**：多个基类继承自同一间接基类时，派生类会包含该间接基类的多个实例（如`Waiter`和`Singer`都继承`Worker`，`SingingWaiter`会有两个`Worker`子对象）。
+
+### 二义性的解决
+
+通过**作用域解析符**明确指定调用的基类方法：
+
+```c++
+class Waiter : public Worker {
+public:
+    void Show() const { cout << "Waiter: " << name << endl; }
+};
+
+class Singer : public Worker {
+public:
+    void Show() const { cout << "Singer: " << name << endl; }
+};
+
+class SingingWaiter : public Waiter, public Singer {
+public:
+    void Show() const {
+        Waiter::Show(); // 明确调用Waiter的Show()
+        Singer::Show(); // 明确调用Singer的Show()
+    }
+};
+```
+
+### 重复继承的解决：虚基类
+
+虚基类（virtual base class）使派生类仅继承间接基类的**一个实例**，解决重复继承问题。
+
+#### 1. 虚基类的声明
+
+在间接基类的继承声明中添加`virtual`关键字：
+
+```c++
+// 虚基类：Worker
+class Worker {
+public:
+    Worker(const std::string& n) : name(n) {}
+    virtual void Show() const = 0;
+private:
+    std::string name;
+};
+
+// Waiter和Singer虚继承Worker
+class Waiter : virtual public Worker { /* ... */ };
+class Singer : virtual public Worker { /* ... */ };
+
+// SingingWaiter仅包含一个Worker实例
+class SingingWaiter : public Waiter, public Singer { /* ... */ };
+```
+
+#### 2. 虚基类的构造函数规则
+
+- 派生类必须**显式调用虚基类的构造函数**（不能通过中间基类传递参数）；
+- 若未显式调用，编译器会调用虚基类的默认构造函数；
+- 构造顺序：先构造虚基类，再构造非虚基类，最后构造派生类。
+
+示例：
+
+```c++
+// SingingWaiter的构造函数
+SingingWaiter::SingingWaiter(const std::string& n, int p, int v)
+    : Worker(n),    // 显式调用虚基类构造函数
+      Waiter(n, p), // 中间基类构造函数
+      Singer(n, v)  // 中间基类构造函数
+{}
+```
+
+### 14.3.4 多重继承的适用场景与注意事项
+
+- 适用场景：派生类确实需要多个基类的功能，且符合 is-a 关系（如 “唱歌的服务员既是服务员也是歌手”）；
+- 注意事项：
+  - 优先避免复杂 MI，可用组合替代（如`SingingWaiter`包含`Waiter`和`Singer`对象）；
+  - 必须使用虚基类解决重复继承问题；
+  - 同名成员需用作用域解析符消除二义性；
+  - 基类析构函数需声明为虚函数，确保删除派生类对象时正确调用所有基类析构函数。
+
+## 4. 类模板：通用类型的代码重用
+
+类模板（class template）是 C++ 实现 “泛型编程” 的核心机制，通过将类型作为参数，创建通用的类模板，可生成针对不同类型的具体类（如`Stack<int>`、`Stack<string>`），极大提升代码重用性。
+
+### 类模板的定义语法
+
+```c++
+template <typename T> // 模板参数：T为类型占位符（typename可替换为class）
+class 模板类名 {
+private:
+    T 成员变量; // 用模板参数表示成员类型
+public:
+    // 构造函数、成员函数（参数和返回值可使用T）
+    模板类名();
+    void 成员函数(const T& param);
+    T 成员函数() const;
+};
+
+// 类模板成员函数的外部实现（需加模板声明）
+template <typename T>
+模板类名<T>::模板类名() {
+    // 实现
+}
+
+template <typename T>
+void 模板类名<T>::成员函数(const T& param) {
+    // 实现
+}
+```
+
+### 类模板的实例化
+
+类模板本身不生成代码，需通过**实例化**生成具体类，分为三种方式：
+
+#### 1. 隐式实例化
+
+声明模板类对象时指定类型，编译器自动生成具体类：
+
+```c++
+template <typename T>
+class Stack {
+private:
+    T items[10];
+    int top;
+public:
+    Stack() : top(0) {}
+    bool push(const T& item) { /* ... */ }
+    bool pop(T& item) { /* ... */ }
+};
+
+// 隐式实例化：生成Stack<int>和Stack<string>类
+Stack<int> int_stack;
+Stack<std::string> str_stack;
+```
+
+#### 2. 显式实例化
+
+用`template`关键字强制生成具体类，无需声明对象：
+
+```c++
+// 显式实例化Stack<double>类（编译器生成完整类代码）
+template class Stack<double>;
+```
+
+#### 3. 显式具体化
+
+为特定类型重写模板类，优先级高于通用模板：
+
+```c++
+// 通用模板
+template <typename T>
+class Stack { /* ... */ };
+
+// 显式具体化：针对const char*的专用实现
+template <>
+class Stack<const char*> {
+private:
+    const char* items[10];
+    int top;
+public:
+    Stack() : top(0) {}
+    bool push(const char* item) { /* 字符串处理逻辑 */ }
+    bool pop(const char*& item) { /* ... */ }
+};
+
+// 使用专用化版本
+Stack<const char*> str_ptr_stack;
+str_ptr_stack.push("hello");
+```
+
+### 类模板的高级特性
+
+#### 1. 多个模板参数
+
+支持多个类型参数或非类型参数（如整型、枚举）：
+
+```c++
+// 多个类型参数
+template <typename T1, typename T2>
+class Pair {
+private:
+    T1 first;
+    T2 second;
+public:
+    Pair(T1 f, T2 s) : first(f), second(s) {}
+    T1 getFirst() const { return first; }
+    T2 getSecond() const { return second; }
+};
+
+// 非类型参数（必须是常量表达式）
+template <typename T, int SIZE>
+class Array {
+private:
+    T arr[SIZE];
+public:
+    T& operator[](int i) { return arr[i]; }
+};
+
+// 使用
+Pair<int, std::string> p(1, "apple");
+Array<double, 5> arr; // 大小为5的double数组
+```
+
+#### 2. 部分具体化
+
+部分限制模板参数的通用性，生成专用模板：
+
+```c++
+// 通用模板
+template <typename T1, typename T2>
+class Pair { /* ... */ };
+
+// 部分具体化：T2为int
+template <typename T1>
+class Pair<T1, int> {
+private:
+    T1 first;
+    int second;
+public:
+    // 针对int的专用实现
+};
+
+// 使用
+Pair<std::string, int> p("score", 95); // 匹配部分具体化模板
+```
+
+#### 3. 模板的嵌套与递归
+
+模板类可包含嵌套模板，或递归使用模板：
+
+```c++
+// 递归模板：二维数组（数组的数组）
+template <typename T, int ROW, int COL>
+class Matrix {
+private:
+    Array<T, COL> rows[ROW]; // 嵌套使用Array模板
+public:
+    T& operator()(int r, int c) { return rows[r][c]; }
+};
+
+// 使用
+Matrix<int, 3, 4> mat; // 3行4列的int矩阵
+mat(0, 0) = 10;
+```
+
+#### 4. 模板作为参数
+
+模板参数可以是另一个模板（用于 STL 等高级场景）：
+
+```c++
+// 模板参数为模板类
+template <template <typename T> class Container, typename T>
+class Processor {
+private:
+    Container<T> container;
+public:
+    void process() { /* 处理容器元素 */ }
+};
+
+// 使用（Container为Stack模板，T为int）
+Processor<Stack, int> proc;
+```
+
+#### 5. C++11 模板别名
+
+用`using`为模板具体化创建别名，简化代码：
+
+```
+// 模板别名：arrtype<T> 等价于 std::array<T, 12>
+template <typename T>
+using arrtype = std::array<T, 12>;
+
+// 使用
+arrtype<int> months; // 等价于std::array<int, 12> months
+arrtype<double> weights; // 等价于std::array<double, 12> weights
+```
+
+### 类模板的友元
+
+模板类的友元分为三类，适配不同场景：
+
+1. **非模板友元**：普通函数成为所有模板实例化的友元；
+2. **约束模板友元**：友元模板的类型与模板类的类型匹配（如`Pair<T1,T2>`的友元`operator<<`仅匹配`Pair<T1,T2>`）；
+3. **非约束模板友元**：友元模板的所有实例化都是模板类所有实例化的友元（通用性最强）。
+
+示例：约束模板友元
+
+```c++
+template <typename T1, typename T2>
+class Pair {
+private:
+    T1 first;
+    T2 second;
+public:
+    Pair(T1 f, T2 s) : first(f), second(s) {}
+    // 约束友元：仅匹配Pair<T1,T2>的operator<<
+    friend std::ostream& operator<< <T1, T2>(std::ostream& os, const Pair<T1,T2>& p);
+};
+
+// 友元模板实现
+template <typename T1, typename T2>
+std::ostream& operator<<(std::ostream& os, const Pair<T1,T2>& p) {
+    os << p.first << ", " << p.second;
+    return os;
+}
+```
+
+### 类模板的使用注意事项
+
+- 模板代码需放在头文件中（不能分离到.cpp 文件，编译器需看到完整模板定义才能实例化）；
+- 模板参数需满足类的操作要求（如`Stack<T>`的`push`需`T`支持赋值操作）；
+- 显式具体化和部分具体化的优先级高于通用模板；
+- 避免过度泛化，仅在类型无关的场景使用模板（如容器类、算法类）。
+
+## 5. 代码重用方式总结与选择指南
+
+### 四种重用方式对比
+
+|    重用方式     |   核心关系   | 继承接口 | 继承实现 |                  适用场景                   |
+| :-------------: | :----------: | :------: | :------: | :-----------------------------------------: |
+|      组合       |    has-a     |    否    |    是    |   大多数 has-a 关系，需隐藏被包含对象接口   |
+| 私有 / 保护继承 |    has-a     |    否    |    是    | 需访问基类保护成员或重写虚函数的 has-a 关系 |
+|    公有继承     |     is-a     |    是    |    是    |  派生类是基类的特例，需复用基类接口和实现   |
+| 多重继承（MI）  |   多 is-a    |    是    |    是    |   派生类需同时具备多个基类的功能（慎用）    |
+|     类模板      | 类型无关重用 |    是    |    是    |   通用容器类、算法类（与类型无关的代码）    |
+
+### 选择原则
+
+1. **优先组合**：简单、安全、灵活，适配绝大多数 has-a 关系；
+2. **其次公有继承**：仅当符合 is-a 关系时使用，避免滥用；
+3. **慎用私有 / 保护继承**：仅在需访问基类保护成员或重写虚函数时使用；
+4. **尽量避免多重继承**：可用组合替代，若必须使用，需解决二义性和重复继承问题；
+5. **模板优先用于通用场景**：如容器、算法，避免为特定类型强行使用模板。
+
+# 友元、异常和其他核心特性
+
+## 1. 友元：突破封装的灵活接口
+
+友元机制允许特定函数、类或类成员函数访问另一个类的私有成员和保护成员，是对封装原则的灵活补充（而非破坏），核心用于设计更简洁的跨类接口。
+
+### 友元类
+
+当一个类需要全面访问另一个类的私有成员时，可将其声明为友元类，友元类的所有方法都拥有访问权限。
+
+#### 1. 声明语法与示例（Tv 与 Remote 类）
+
+```C++
+class Tv {
+public:
+    friend class Remote; // 声明Remote为友元类
+    // 其他成员声明
+private:
+    int state;    // 开/关状态
+    int volume;   // 音量
+    int channel;  // 频道
+    // 其他私有成员
+};
+
+class Remote {
+public:
+    // 所有方法均可访问Tv的私有成员
+    void set_chan(Tv &t, int c) { t.channel = c; } // 直接修改Tv的channel
+    void volup(Tv &t) { if (t.volume < 20) t.volume++; }
+};
+```
+
+#### 2. 关键要点
+
+- 友元声明可位于类的公有、私有或保护部分，位置不影响权限；
+- 友元关系是单向的：Tv 声明 Remote 为友元，不代表 Remote 自动声明 Tv 为友元；
+- 友元关系不可传递：若 A 是 B 的友元，B 是 C 的友元，A 不一定是 C 的友元。
+
+### 友元成员函数
+
+若仅需某个类的特定成员函数访问目标类，可声明该成员函数为友元（更严格的权限控制），需解决声明顺序的循环依赖问题。
+
+#### 1. 声明步骤与示例
+
+```c++
+// 步骤1：前向声明目标类（解决循环依赖）
+class Tv;
+
+// 步骤2：声明友元所在类（Remote），仅包含方法原型
+class Remote {
+public:
+    void set_chan(Tv &t, int c); // 仅声明，定义放在Tv之后
+    // 其他方法声明
+};
+
+// 步骤3：定义目标类（Tv），声明友元成员函数
+class Tv {
+public:
+    friend void Remote::set_chan(Tv &t, int c); // 仅set_chan为友元
+    // 其他成员声明
+private:
+    int channel;
+};
+
+// 步骤4：定义友元成员函数（需看到Tv的完整定义）
+inline void Remote::set_chan(Tv &t, int c) {
+    t.channel = c; // 合法访问Tv的私有成员
+}
+```
+
+#### 2. 核心注意事项
+
+- 必须通过**前向声明**解决 “友元类需访问目标类，目标类需声明友元” 的循环依赖；
+- 友元成员函数的声明需在目标类之前，定义需在目标类之后（确保编译器看到完整的目标类结构）；
+- 内联友元成员函数需将定义放在头文件中（保证编译时可见）。
+
+### 其他友元关系
+
+#### 1. 相互友元（双向访问）
+
+两个类互相声明对方为友元，允许彼此的方法访问对方的私有成员：
+
+```c++
+class Tv {
+    friend class Remote;
+public:
+    void buzz(Remote &r) { /* 可访问Remote的私有成员 */ }
+};
+
+class Remote {
+    friend class Tv;
+public:
+    void volup(Tv &t) { /* 可访问Tv的私有成员 */ }
+};
+```
+
+#### 2. 共同友元（访问多个类的函数）
+
+一个函数需访问多个类的私有成员时，需被每个类声明为友元：
+
+```C++
+class Analyzer; // 前向声明
+
+class Probe {
+    friend void sync(Analyzer &a, const Probe &p); // 共同友元
+private:
+    int clock;
+};
+
+class Analyzer {
+    friend void sync(Analyzer &a, const Probe &p); // 共同友元
+private:
+    int clock;
+};
+
+// 共同友元函数定义，可访问两个类的私有成员
+void sync(Analyzer &a, const Probe &p) {
+    a.clock = p.clock; // 同步时钟
+}
+```
+
+## 2. 嵌套类：作用域限定的辅助类
+
+嵌套类是在另一个类内部声明的类，核心作用是封装辅助逻辑、避免名称冲突，其作用域被限定在包含类内部。
+
+### 嵌套类的核心特征
+
+- 嵌套类与包含类是**独立关系**，不是继承或包含关系（包含类不自动拥有嵌套类的成员，嵌套类也不自动访问包含类的成员）；
+- 嵌套类的访问权限由其在包含类中的声明位置决定（公有 / 私有 / 保护）；
+- 包含类的成员函数可直接创建和使用嵌套类的对象，外部需通过`包含类::嵌套类`访问（仅当嵌套类声明为公有）。
+
+### 嵌套类的实现示例（Queue 中的 Node 类）
+
+```C++
+template <typename T>
+class Queue {
+private:
+    // 私有嵌套类：仅Queue内部使用，外部不可见
+    class Node {
+    public:
+        T item;
+        Node *next;
+        Node(const T &i) : item(i), next(nullptr) {} // 嵌套类构造函数
+    };
+    Node *front; // 指向队首
+    Node *rear;  // 指向队尾
+    int items;
+public:
+    Queue() : front(nullptr), rear(nullptr), items(0) {}
+    ~Queue() { /* 释放所有Node节点 */ }
+    bool enqueue(const T &item) {
+        Node *add = new Node(item); // 创建嵌套类对象
+        if (isempty()) front = add;
+        else rear->next = add;
+        rear = add;
+        items++;
+        return true;
+    }
+    // 其他队列方法
+};
+```
+
+### 嵌套类的访问控制
+
+| 嵌套类声明位置 | 包含类是否可访问 | 包含类的派生类是否可访问 |      外部是否可访问      |
+| :------------: | :--------------: | :----------------------: | :----------------------: |
+|    私有部分    |        是        |            否            |            否            |
+|    保护部分    |        是        |            是            |            否            |
+|    公有部分    |        是        |            是            | 是（需`包含类::嵌套类`） |
+
+### 模板中的嵌套类
+
+嵌套类可与模板结合，嵌套类的类型会随模板参数变化，自动生成不同的具体化：
+
+```C++
+template <typename T>
+class QueueTP {
+private:
+    class Node { // 嵌套类随T变化
+    public:
+        T item;
+        Node *next;
+        Node(const T &i) : item(i), next(nullptr) {}
+    };
+    Node *front;
+    // 其他成员
+};
+
+// 使用示例：两个不同的Node类（QueueTP<double>::Node和QueueTP<char>::Node）
+QueueTP<double> dq; // Node存储double
+QueueTP<char> cq;   // Node存储char
+```
+
+## 3. 异常：运行时错误的优雅处理
+
+异常机制是 C++ 处理运行时错误（如除零、内存分配失败、非法参数）的标准方式，核心是将错误处理与正常逻辑分离，确保程序的健壮性。
+
+### 异常的核心组件
+
+- **throw 语句**：引发异常，中断当前函数执行，传递异常信息；
+
+- **try 块**：包裹可能引发异常的代码，标识异常检测范围；
+
+- **catch 块**：捕获并处理异常，需与 throw 的异常类型匹配；
+
+- **异常类**：封装异常信息（如错误原因、参数值），通常继承自标准异常类。
+
+### 15.3.2 异常的基本使用示例
+
+```C++
+#include <iostream>
+#include <stdexcept> // 标准异常类头文件
+
+// 计算调和平均数，非法参数时引发异常
+double hmean(double a, double b) {
+    if (a == -b) {
+        throw std::domain_error("hmean: a = -b，非法参数"); // 引发标准异常
+    }
+    return 2.0 * a * b / (a + b);
+}
+
+int main() {
+    double x, y, z;
+    while (std::cin >> x >> y) {
+        try { // try块包裹可能出错的代码
+            z = hmean(x, y);
+            std::cout << "调和平均数：" << z << std::endl;
+        } catch (std::domain_error &e) { // 捕获特定类型异常
+            std::cout << "错误：" << e.what() << std::endl; // what()返回错误信息
+            std::cout << "请重新输入：" << std::endl;
+            continue;
+        }
+    }
+    return 0;
+}
+```
+
+### 异常类的设计与继承
+
+自定义异常类通常继承自 C++ 标准异常类（如`std::exception`、`std::logic_error`、`std::runtime_error`），确保兼容性和一致性。
+
+#### 1. 标准异常类层次
+
+- `std::exception`：所有标准异常的基类，提供`what()`虚方法；
+- `std::logic_error`：逻辑错误（可通过编程避免，如非法参数），派生类包括`domain_error`、`invalid_argument`等；
+- `std::runtime_error`：运行时错误（难以提前避免，如内存分配失败），派生类包括`range_error`、`overflow_error`等。
+
+#### 2. 自定义异常类示例
+
+```C++
+#include <stdexcept>
+#include <string>
+
+// 继承自std::logic_error（逻辑错误）
+class bad_hmean : public std::logic_error {
+public:
+    // 构造函数：传递错误信息给基类
+    bad_hmean(const std::string &msg) : std::logic_error(msg) {}
+};
+
+// 引发自定义异常
+double hmean(double a, double b) {
+    if (a == -b) {
+        throw bad_hmean("hmean: a = -b，非法参数");
+    }
+    return 2.0 * a * b / (a + b);
+}
+```
+
+### 栈解退
+
+当异常被引发时，程序会终止当前函数执行，沿函数调用链回溯，释放栈中的自动变量（调用析构函数），直到找到匹配的 catch 块，这个过程称为栈解退。
+
+#### 栈解退的关键特性
+
+- 栈中的自动类对象会被自动析构，避免内存泄漏；
+- 仅释放 try 块到 throw 语句之间的栈帧，直到找到包含 try 块的函数；
+- 若未找到匹配的 catch 块，程序调用`terminate()`终止（默认调用`abort()`）。
+
+#### 示例：栈解退中的析构函数调用
+
+```
+class Demo {
+public:
+    Demo(const std::string &s) : str(s) { std::cout << "Demo " << str << " 创建" << std::endl; }
+    ~Demo() { std::cout << "Demo " << str << " 销毁" << std::endl; }
+private:
+    std::string str;
+};
+
+void func() {
+    Demo d("func中的对象");
+    throw std::runtime_error("测试栈解退"); // 引发异常
+}
+
+int main() {
+    Demo d("main中的对象");
+    try {
+        func();
+    } catch (std::runtime_error &e) {
+        std::cout << "捕获异常：" << e.what() << std::endl;
+    }
+    return 0;
+}
+```
+
+**输出结果**（栈解退时自动析构 func 中的 Demo 对象）：
+
+```
+Demo main中的对象 创建
+Demo func中的对象 创建
+Demo func中的对象 销毁
+捕获异常：测试栈解退
+Demo main中的对象 销毁
+```
+
+### 异常处理的高级特性
+
+#### 1. 重新引发异常
+
+catch 块处理部分逻辑后，可通过`throw`重新引发异常，传递给上层处理：
+
+```C++
+void func() {
+    try {
+        hmean(10, -10);
+    } catch (bad_hmean &e) {
+        std::cout << "func中捕获异常，重新引发" << std::endl;
+        throw; // 重新引发当前异常
+    }
+}
+```
+
+#### 2. 捕获所有异常
+
+使用`catch (...)`可捕获任意类型的异常，通常作为最后一个 catch 块：
+
+```c++
+try {
+    // 可能引发多种异常的代码
+} catch (bad_hmean &e) {
+    // 处理特定异常
+} catch (...) {
+    std::cout << "捕获未知异常" << std::endl;
+}
+```
+
+#### 3. 未捕获异常与意外异常
+
+- **未捕获异常**：无匹配的 catch 块，默认调用`terminate()`；
+- **意外异常**：函数引发的异常不在其异常规范（C++11 已摒弃）列表中，默认调用`unexpected()`，最终调用`terminate()`。
+
+### 15.3.6 异常与动态内存
+
+异常可能导致动态内存泄漏，需特别注意：
+
+```C++
+void func() {
+    double *arr = new double[100]; // 动态分配内存
+    throw std::runtime_error("异常"); // 引发异常，delete未执行
+    delete[] arr; // 永远不会执行，内存泄漏
+}
+```
+
+**解决方法**：
+
+- 在 catch 块中释放内存后重新引发异常；
+- 使用智能指针（如`std::unique_ptr`）自动管理内存。
+
+## 4. RTTI：运行阶段类型识别
+
+RTTI（Runtime Type Identification）允许程序在运行时确定对象的实际类型，核心用于含虚函数的类层次结构，辅助多态编程。
+
+### RTTI 的核心组件
+
+- **dynamic_cast 运算符**：安全地将基类指针 / 引用转换为派生类指针 / 引用，失败时返回空指针（指针转换）或引发`bad_cast`异常（引用转换）；
+
+- **typeid 运算符**：返回`type_info`对象的引用，标识对象的实际类型；
+
+- **type_info 类**：存储类型信息，提供`==`、`!=`运算符和`name()`方法（返回类型名称字符串）。
+
+### dynamic_cast 的使用（安全类型转换）
+
+```C++
+class Grand { // 基类，必须含虚函数
+public:
+    virtual void speak() const { std::cout << "Grand类" << std::endl; }
+};
+
+class Superb : public Grand {
+public:
+    void speak() const override { std::cout << "Superb类" << std::endl; }
+    virtual void say() const { std::cout << "Superb的say方法" << std::endl; }
+};
+
+class Magnificent : public Superb {
+public:
+    void speak() const override { std::cout << "Magnificent类" << std::endl; }
+    void say() const override { std::cout << "Magnificent的say方法" << std::endl; }
+};
+
+int main() {
+    Grand *pg = new Magnificent();
+    Superb *ps = dynamic_cast<Superb*>(pg); // 安全转换，成功返回非空指针
+    if (ps != nullptr) {
+        ps->say(); // 调用Magnificent的say方法
+    }
+
+    Grand &rg = *new Grand();
+    try {
+        Superb &rs = dynamic_cast<Superb&>(rg); // 引用转换失败，引发bad_cast
+    } catch (std::bad_cast &e) {
+        std::cout << "转换失败：" << e.what() << std::endl;
+    }
+    return 0;
+}
+```
+
+#### 关键要点
+
+- dynamic_cast 仅适用于含**虚函数**的类层次结构；
+- 向上转换（派生类→基类）无需 dynamic_cast，自动完成；
+- 向下转换（基类→派生类）需用 dynamic_cast 确保安全。
+
+### typeid 与 type_info 的使用（类型判断）
+
+```C++
+#include <typeinfo>
+
+int main() {
+    Grand *pg1 = new Superb();
+    Grand *pg2 = new Grand();
+
+    // 比较对象实际类型
+    if (typeid(*pg1) == typeid(Superb)) {
+        std::cout << "pg1指向Superb对象" << std::endl;
+    }
+
+    // 获取类型名称（输出格式随编译器而异）
+    std::cout << "pg1指向的类型：" << typeid(*pg1).name() << std::endl;
+    std::cout << "pg2指向的类型：" << typeid(*pg2).name() << std::endl;
+
+    // 空指针引发bad_typeid异常
+    Grand *pg3 = nullptr;
+    try {
+        typeid(*pg3);
+    } catch (std::bad_typeid &e) {
+        std::cout << "错误：" << e.what() << std::endl;
+    }
+    return 0;
+}
+```
+
+### RTTI 的误用与注意事项
+
+- 优先使用**虚函数**而非 RTTI：虚函数是多态的原生支持，更简洁高效；
+- 避免用 typeid 判断类型后强制转换：应使用 dynamic_cast，后者更安全；
+- RTTI 会增加程序开销，仅在必要时使用（如调试、特定类型的额外操作）。
+
+## 5. 类型转换运算符：安全可控的类型转换
+
+### 四种类型转换运算符对比
+
+|      运算符      |               核心用途               |                        适用场景                         |                  限制与风险                   |
+| :--------------: | :----------------------------------: | :-----------------------------------------------------: | :-------------------------------------------: |
+|   dynamic_cast   |      类层次结构中的安全类型转换      |        基类↔派生类的指针 / 引用转换（含虚函数）         | 仅适用于含虚函数的类，失败返回空指针 / 抛异常 |
+|    const_cast    |      移除 const/volatile 限定符      | 临时修改 const 变量的访问权限（需确保变量本身非 const） |      不能修改类型本身，仅改变 const 属性      |
+|   static_cast    | 非多态类型转换、编译时确定的类型转换 |         数值类型转换、向上转换、无关类指针转换          |       不检查运行时类型，向下转换不安全        |
+| reinterpret_cast |       底层二进制级别的类型转换       |            依赖实现的底层编程（如指针→整型）            |      不可移植，风险极高，仅在必要时使用       |
+
+### 各运算符详细使用示例
+
+#### 1. const_cast（移除 const 限定符）
+
+```c++
+void func(const int *p) {
+    // 移除const限定符，仅当p指向非const变量时可修改
+    int *pc = const_cast<int*>(p);
+    *pc = 100; // 若原变量是const，行为未定义
+}
+
+int main() {
+    int a = 20;
+    const int b = 30;
+    func(&a);  // 合法，a非const，修改后a=100
+    func(&b);  // 危险，b是const，修改行为未定义
+    return 0;
+}
+```
+
+#### 2. static_cast（编译时类型转换）
+
+```c++
+// 数值类型转换
+double d = 3.14;
+int i = static_cast<int>(d); // 合法，截断为3
+
+// 向上转换（安全）
+Superb *ps = new Magnificent();
+Grand *pg = static_cast<Grand*>(ps);
+
+// 向下转换（不安全，编译通过但运行时可能出错）
+Grand *pg2 = new Grand();
+Superb *ps2 = static_cast<Superb*>(pg2); // 无语法错误，但调用ps2->say()会出错
+```
+
+#### 3. reinterpret_cast（底层类型转换）
+
+```c++
+// 指针→整型（需确保整型足够存储指针）
+int *p = new int(10);
+long addr = reinterpret_cast<long>(p); // 存储指针地址
+
+// 不同类型指针转换（风险极高）
+struct Data { int x; int y; };
+long value = 0x12345678;
+Data *pd = reinterpret_cast<Data*>(&value); // 强制转换，依赖内存布局
+```
+
+### 类型转换的最佳实践
+
+- 避免不必要的类型转换，优先使用类型安全的代码；
+- 多态类型转换优先用`dynamic_cast`，非多态类型转换用`static_cast`；
+- 仅在明确需要修改 const 属性时用`const_cast`，且确保原变量非 const；
+- 尽量不用`reinterpret_cast`，仅在底层编程（如硬件操作）时使用。
+
+# 十三、string 类和标准模板库（STL）
+
+## 1. string 类：灵活高效的字符串处理
+
+string 类是 C++ 标准库提供的字符串处理工具，封装了 C 风格字符串的复杂操作，支持自动内存管理、动态扩容，提供了丰富的成员方法，是字符串处理的首选方案。
+
+### string 类的构造函数
+
+|                         构造函数原型                         |              功能描述              |                          示例                           |
+| :----------------------------------------------------------: | :--------------------------------: | :-----------------------------------------------------: |
+|                   `string(const char* s)`                    |   用 C 风格字符串（NBTS）初始化    |                  `string s1("hello");`                  |
+|                `string(size_type n, char c)`                 |     创建含 n 个字符 c 的字符串     |             `string s2(5, 'a'); // "aaaaa"`             |
+|                 `string(const string& str)`                  |            复制构造函数            |                    `string s3(s1);`                     |
+|                          `string()`                          |        默认构造（空字符串）        |                      `string s4;`                       |
+|             `string(const char* s, size_type n)`             | 用 C 风格字符串的前 n 个字符初始化 |            `string s5("hello", 3); // "hel"`            |
+|                `string(Iter begin, Iter end)`                |  用迭代器区间 [begin, end) 初始化  | `char arr[] = "world"; string s6(arr, arr+3); // "wor"` |
+| `string(const string& str, size_type pos = 0, size_type n = npos)` |  截取 str 从 pos 开始的 n 个字符   |             `string s7(s1, 1, 3); // "ell"`             |
+|             `string(initializer_list<char> il)`              |   C++11 新增，用初始化列表初始化   |              `string s8{'h','i'}; // "hi"`              |
+
+### string 类的输入与输出
+
+string 类支持两种核心输入方式，自动适配字符串长度，无需手动管理内存：
+
+#### 1. 输入方式
+
+- `cin >> s`：读取字符串，以空白字符（空格、换行、制表符）为分隔符，自动忽略前导空白；
+- `getline(cin, s, delim)`：读取一行字符串，以`delim`为分隔符（默认`'\n'`），保留中间空格，自动扩容存储整行内容。
+
+#### 2. 输出方式
+
+- 直接使用`cout << s`（重载`<<`运算符）；
+- 支持链式输出，如`cout << s1 << " " << s2 << endl;`。
+
+#### 3. 文件输入示例（按分隔符读取）
+
+```C++
+#include <fstream>
+#include <string>
+using namespace std;
+
+int main() {
+    ifstream fin("tobuy.txt");
+    string item;
+    int count = 0;
+    // 以':'为分隔符读取文件内容
+    while (getline(fin, item, ':')) {
+        cout << ++count << ": " << item << endl;
+    }
+    fin.close();
+    return 0;
+}
+```
+
+### string 类的核心操作
+
+#### 1. 字符串比较
+
+重载`==`、`!=`、`<`、`>`等 6 个关系运算符，支持与 string 对象或 C 风格字符串比较：
+
+```c++
+string s1("apple"), s2("banana");
+if (s1 < s2) cout << "s1 is less than s2" << endl; // 按字典序比较
+if (s1 == "apple") cout << "s1 equals \"apple\"" << endl;
+```
+
+#### 2. 字符串长度与容量
+
+- `size()`/`length()`：返回字符串实际字符数（功能相同，`size()`为 STL 兼容新增）；
+- `capacity()`：返回当前分配的内存块可存储的字符数（大于等于`size()`）；
+- `reserve(n)`：预分配至少 n 个字符的内存，减少扩容开销。
+
+#### 3. 字符串查找与替换
+
+- `find(const string& str, size_type pos = 0)`：从 pos 开始查找 str，返回首次出现的起始索引，未找到返回`string::npos`；
+- `rfind()`：反向查找（从末尾开始）；
+- `find_first_of()`：查找参数中任意字符的首次出现；
+- `replace(pos, len, str)`：从 pos 开始，替换 len 个字符为 str。
+
+示例：
+
+```c++
+string s("hello world");
+size_t pos = s.find("world");
+if (pos != string::npos) {
+    s.replace(pos, 5, "cpp"); // s变为"hello cpp"
+}
+```
+
+#### 4. 字符串拼接与修改
+
+- `+=`：拼接 string 对象、C 风格字符串或单个字符；
+- `append(str)`：在末尾追加 str；
+- `insert(pos, str)`：在 pos 位置插入 str；
+- `erase(pos, len)`：从 pos 开始删除 len 个字符；
+- `clear()`：清空字符串（`size()`变为 0，`capacity()`不变）。
+
+#### 5. C 风格字符串兼容
+
+`c_str()`：返回指向 C 风格字符串（以`'\0'`结尾）的 const 指针，用于需要 C 风格字符串的场景（如文件打开）：
+
+```c++
+string filename("data.txt");
+FILE* fp = fopen(filename.c_str(), "r");
+```
+
+### string 类的底层特性
+
+- 自动扩容：当字符串长度超过`capacity()`时，通常扩容为原来的 2 倍，减少内存分配次数；
+- 不可变字符串：string 对象的内容可修改，但`c_str()`返回的指针不可修改；
+- 字符串种类：底层基于`basic_string`模板，提供`wstring`（宽字符）、`u16string`（UTF-16）、`u32string`（UTF-32）等具体化。
+
+## 2. 智能指针：安全的动态内存管理
+
+智能指针是行为类似指针的类对象，通过析构函数自动释放动态内存，避免内存泄漏，核心包括`auto_ptr`（C++11 摒弃）、`unique_ptr`（推荐）、`shared_ptr`（共享所有权）。
+
+### 智能指针的核心原理
+
+- 持有动态内存的指针（`new`分配）；
+- 析构函数中调用`delete`（或`delete[]`）释放内存；
+- 重载`*`（解引用）、`->`（访问成员）等指针操作符，行为与普通指针一致。
+
+### 三种智能指针的对比与使用
+
+#### 1. auto_ptr
+
+- 特性：独占所有权，赋值或拷贝会转移所有权（导致原指针悬空）；
+
+- 缺陷：可能引发非法访问（如拷贝后原指针解引用），C++11 已被`unique_ptr`替代；
+
+- 示例：
+
+  ```C++
+  auto_ptr<string> p1(new string("test"));
+  auto_ptr<string> p2 = p1; // p1失去所有权，变为空指针
+  // p1->size(); // 未定义行为
+  ```
+
+#### 2. unique_ptr
+
+- 特性：严格独占所有权，禁止赋值和拷贝（编译报错），仅允许移动语义（`std::move`）；
+
+- 优势：比`auto_ptr`更安全，支持数组（`unique_ptr<T[]>`）；
+
+- 使用场景：单个对象的动态内存管理，无需共享所有权；
+
+- 示例：
+
+  ```C++
+  #include <memory>
+  unique_ptr<string> p1(new string("unique"));
+  // unique_ptr<string> p2 = p1; // 编译错误，禁止拷贝
+  unique_ptr<string> p2 = move(p1); // 转移所有权，p1变为空
+  p2->append(" test"); // 合法，p2拥有所有权
+  
+  // 支持数组（自动调用delete[]）
+  unique_ptr<int[]> p3(new int[5]{1,2,3,4,5});
+  p3[0] = 10; // 合法访问数组元素
+  ```
+
+#### 3. shared_ptr（共享所有权）
+
+- 特性：通过引用计数管理内存，多个`shared_ptr`可指向同一对象，计数为 0 时自动释放；
+
+- 优势：支持拷贝、赋值，适合多对象共享动态内存；
+
+- 注意事项：避免循环引用（需配合`weak_ptr`解决）；
+
+- 示例：
+
+  ```C++
+  shared_ptr<string> p1(new string("shared"));
+  shared_ptr<string> p2 = p1; // 引用计数变为2
+  cout << p1.use_count() << endl; // 输出2
+  p1.reset(); // 引用计数变为1
+  p2.reset(); // 引用计数变为0，内存自动释放
+  ```
+
+#### 4. 智能指针选择指南
+
+|         场景         |  推荐智能指针   |               原因               |
+| :------------------: | :-------------: | :------------------------------: |
+| 单个对象，独占所有权 |   unique_ptr    |      高效、安全，无额外开销      |
+|   多对象共享所有权   |   shared_ptr    |      引用计数管理，自动释放      |
+|       动态数组       | unique_ptr<T[]> |     支持`delete[]`，安全高效     |
+|     避免循环引用     |    weak_ptr     | 配合`shared_ptr`，不增加引用计数 |
+
+### 智能指针的使用禁忌
+
+- 不可指向栈内存（析构时会调用`delete`，导致未定义行为）；
+- 不可用同一个裸指针初始化多个智能指针（导致重复释放）；
+- `shared_ptr`避免循环引用（如 A 和 B 互相持有`shared_ptr`，计数永远不为 0）。
+
+## 3. 标准模板库（STL）：泛型编程的核心
+
+STL 是一套通用模板库，包含容器、迭代器、算法、函数对象四大组件，遵循泛型编程思想（代码独立于数据类型和容器类型），实现代码高度重用。
+
+### STL 核心组件关系
+
+- **容器**：存储数据的集合（如 vector、list、map）；
+- **迭代器**：广义指针，连接容器和算法，提供统一的访问接口；
+- **算法**：操作容器数据的函数（如 sort、find、for_each）；
+- **函数对象**：行为类似函数的对象（如谓词、预定义函数符），作为算法的参数。
+
+### 容器：数据的存储结构
+
+STL 容器分为序列容器、关联容器、无序关联容器、适配器四大类，均支持`begin()`（首元素迭代器）、`end()`（超尾迭代器）、`size()`（元素个数）等通用操作。
+
+#### 1. 序列容器
+
+按线性顺序存储数据，支持按索引或位置访问，核心包括：
+
+|         容器          |               特性               |          适用场景           |  时间复杂度（插入 / 删除）   |
+| :-------------------: | :------------------------------: | :-------------------------: | :--------------------------: |
+|        vector         |   动态数组，随机访问，尾部扩容   |  频繁访问、尾部插入 / 删除  |    尾部 O (1)，中间 O (n)    |
+|         deque         | 双端队列，随机访问，两端高效操作 |  两端插入 / 删除，随机访问  |    两端 O (1)，中间 O (n)    |
+|         list          |     双向链表，不支持随机访问     | 频繁插入 / 删除（任意位置） | 任意位置 O (1)（已知迭代器） |
+| forward_list（C++11） |        单向链表，节省空间        |   单向遍历，频繁头部插入    |  头部 O (1)，其他位置 O (n)  |
+|    array（C++11）     |     固定大小数组，栈内存分配     |   固定长度数据，高效访问    |    不支持动态插入 / 删除     |
+
+#### 2. 关联容器
+
+基于红黑树实现，按键有序存储，支持快速查找（O (log n)），核心包括：
+
+|   容器   |               特性                |       适用场景        |          关键说明          |
+| :------: | :-------------------------------: | :-------------------: | :------------------------: |
+|   set    |      有序无重复键（键 = 值）      | 排序 + 去重，快速查找 | 插入时自动排序，无重复元素 |
+| multiset |           有序可重复键            |  排序 + 允许重复元素  |      支持多个相同键值      |
+|   map    | 有序无重复键，键值对（key-value） | 字典式存储，快速查找  |    键唯一，通过键访问值    |
+| multimap |       有序可重复键，键值对        |   一个键对应多个值    |    支持同一键关联多个值    |
+
+示例（map 的使用）：
+
+```C++
+#include <map>
+map<int, string> dict; // 键int，值string
+dict.insert({1, "one"});
+dict[2] = "two"; // 数组式赋值
+cout << dict[1] << endl; // 输出"one"
+
+// 遍历map（按键有序）
+for (auto it = dict.begin(); it != dict.end(); ++it) {
+    cout << it->first << ": " << it->second << endl;
+}
+```
+
+#### 3. 无序关联容器
+
+基于哈希表实现，按键哈希存储，无序，查找速度更快（平均 O (1)），核心包括`unordered_set`、`unordered_multiset`、`unordered_map`、`unordered_multimap`，用法与关联容器类似，适用于无需排序、追求高效查找的场景。
+
+#### 4. 容器适配器
+
+封装底层容器，提供特定接口，不支持迭代器遍历，核心包括：
+
+|     适配器     | 底层容器（默认） |        特性        |            核心操作            |
+| :------------: | :--------------: | :----------------: | :----------------------------: |
+|     stack      |      deque       |     栈（LIFO）     |      push()、pop()、top()      |
+|     queue      |      deque       |    队列（FIFO）    | push()、pop()、front()、back() |
+| priority_queue |      vector      | 优先队列（大顶堆） |      push()、pop()、top()      |
+
+示例（priority_queue 的使用）：
+
+```C++
+#include <queue>
+priority_queue<int> pq; // 大顶堆（默认）
+pq.push(3);
+pq.push(1);
+pq.push(2);
+while (!pq.empty()) {
+    cout << pq.top() << " "; // 输出"3 2 1"
+    pq.pop();
+}
+```
+
+### 迭代器：容器与算法的桥梁
+
+迭代器是广义指针，提供统一的容器访问接口，按功能强弱分为 5 类：
+
+|   迭代器类型   |        核心操作        |        支持的容器         |
+| :------------: | :--------------------: | :-----------------------: |
+|   输入迭代器   |    只读、++、==、!=    |         所有容器          |
+|   输出迭代器   |        只写、++        |         所有容器          |
+|   正向迭代器   |        读写、++        | forward_list、set、map 等 |
+|   双向迭代器   |      读写、++、--      |     list、set、map 等     |
+| 随机访问迭代器 | 读写、++、--、+、-、[] |   vector、deque、array    |
+
+#### 1. 迭代器的基本使用
+
+```C++
+vector<int> vec = {1,2,3,4,5};
+vector<int>::iterator it = vec.begin(); // 正向迭代器
+*it = 10; // 修改首元素（vec变为[10,2,3,4,5]）
+++it; // 指向第二个元素
+cout << *it << endl; // 输出2
+
+// 反向迭代器（rbegin()指向末尾，rend()指向开头）
+vector<int>::reverse_iterator rit = vec.rbegin();
+cout << *rit << endl; // 输出5
+```
+
+#### 2. 迭代器适配器（Adapter）
+
+STL 提供预定义迭代器适配器，扩展迭代器功能：
+
+- `ostream_iterator`：将输出流包装为迭代器，用于算法输出：
+
+  ```C++
+  #include <iterator>
+  ostream_iterator<int> out(cout, " ");
+  vector<int> vec = {1,2,3};
+  copy(vec.begin(), vec.end(), out); // 输出"1 2 3 "
+  ```
+
+- `istream_iterator`：将输入流包装为迭代器，用于算法输入：
+
+  ```C++
+  istream_iterator<int> in(cin), end;
+  vector<int> vec(in, end); // 从cin读取数据到vec
+  ```
+
+- `insert_iterator`：将复制操作转为插入操作，自动扩容：
+
+  ```C++
+  vector<int> vec1 = {1,2,3};
+  vector<int> vec2 = {4,5};
+  // 插入到vec1开头
+  copy(vec2.begin(), vec2.end(), insert_iterator<vector<int>>(vec1, vec1.begin()));
+  // vec1变为[4,5,1,2,3]
+  ```
+
+### 算法：操作容器数据的通用函数
+
+STL 算法是独立于容器的模板函数，通过迭代器操作数据，分为四大类：
+
+#### 1. 非修改式序列操作（不改变容器内容）
+
+- `for_each(iter1, iter2, func)`：对区间 [iter1, iter2) 的每个元素执行 func；
+- `find(iter1, iter2, val)`：查找 val，返回迭代器（未找到返回 iter2）；
+- `count(iter1, iter2, val)`：统计 val 在区间中的个数。
+
+示例：
+
+```C++
+#include <algorithm>
+void print(int x) { cout << x << " "; }
+vector<int> vec = {1,2,3,2,4};
+for_each(vec.begin(), vec.end(), print); // 输出"1 2 3 2 4"
+int cnt = count(vec.begin(), vec.end(), 2); // cnt=2
+auto it = find(vec.begin(), vec.end(), 3); // 指向3的迭代器
+```
+
+#### 2. 修改式序列操作（改变容器内容）
+
+- `copy(iter1, iter2, dest)`：复制区间到 dest 迭代器；
+- `transform(iter1, iter2, dest, func)`：对区间元素执行 func，结果存入 dest；
+- `replace(iter1, iter2, old_val, new_val)`：替换区间中的 old_val 为 new_val；
+- `sort(iter1, iter2, comp)`：对区间排序（默认升序，comp 为比较函数）。
+
+示例（sort 排序自定义类型）：
+
+```C++
+struct Person {
+    string name;
+    int age;
+};
+bool cmp(const Person& p1, const Person& p2) {
+    return p1.age < p2.age; // 按年龄升序
+}
+vector<Person> people = {{"Alice", 25}, {"Bob", 20}};
+sort(people.begin(), people.end(), cmp); // 按年龄排序
+```
+
+#### 3. 排序和相关操作
+
+- `sort(iter1, iter2)`：快速排序（随机访问迭代器）；
+- `stable_sort(iter1, iter2)`：稳定排序；
+- `binary_search(iter1, iter2, val)`：二分查找（需先排序）；
+- `set_union/set_intersection/set_difference`：集合的并、交、差运算（需先排序）。
+
+#### 4. 数字运算（头文件`<numeric>`）
+
+- `accumulate(iter1, iter2, init)`：累加区间元素（init 为初始值）；
+- `inner_product(iter1, iter2, iter3, init)`：计算两个区间的内积。
+
+示例：
+
+```C++
+#include <numeric>
+vector<int> vec = {1,2,3,4};
+int sum = accumulate(vec.begin(), vec.end(), 0); // sum=10
+int product = inner_product(vec.begin(), vec.end(), vec.begin(), 0); // 1*1 + 2*2 + 3*3 +4*4=30
+```
+
+### 函数对象：算法的参数扩展
+
+函数对象是重载`operator()`的类对象，可作为算法参数，携带额外状态，分为：
+
+#### 1. 预定义函数符（头文件`<functional>`）
+
+STL 提供内置函数对象，对应算术、关系、逻辑运算符：
+
+- 算术：`plus<T>`（+）、`minus<T>`（-）、`multiplies<T>`（*）；
+- 关系：`equal_to<T>`（==）、`greater<T>`（>）、`less<T>`（<）；
+- 逻辑：`logical_and<T>`（&&）、`logical_or<T>`（||）。
+
+示例（使用`plus`求和）：
+
+```C++
+vector<int> vec1 = {1,2,3}, vec2 = {4,5,6};
+vector<int> res(3);
+// 两个区间对应元素相加，结果存入res
+transform(vec1.begin(), vec1.end(), vec2.begin(), res.begin(), plus<int>());
+// res变为[5,7,9]
+```
+
+#### 2. 谓词
+
+返回`bool`的函数对象，分为一元谓词（1 个参数）和二元谓词（2 个参数），用于算法的条件判断：
+
+```C++
+// 一元谓词：判断是否大于3
+bool isGreaterThan3(int x) { return x > 3; }
+vector<int> vec = {1,4,2,5};
+// 统计大于3的元素个数
+int cnt = count_if(vec.begin(), vec.end(), isGreaterThan3); // cnt=2
+```
+
+#### 3. 函数适配器
+
+修改函数对象的参数或返回值，如`bind1st`（绑定第一个参数）、`bind2nd`（绑定第二个参数）：
+
+```C++
+vector<int> vec = {1,2,3,4};
+// 将每个元素乘以2.5（bind1st绑定multiplies的第一个参数为2.5）
+transform(vec.begin(), vec.end(), ostream_iterator<int>(cout, " "), bind1st(multiplies<double>(), 2.5));
+```
+
+## 4. 其他常用库
+
+### valarray：数值数组的高效运算
+
+valarray 是面向数值计算的数组模板，支持元素级运算、数学函数，接口简洁，适合科学计算：
+
+```C++
+#include <valarray>
+valarray<double> va1 = {1.0,2.0,3.0};
+valarray<double> va2 = {4.0,5.0,6.0};
+valarray<double> va3 = va1 + va2; // 元素级相加：[5.0,7.0,9.0]
+valarray<double> va4 = va1 * 2.0; // 每个元素乘以2：[2.0,4.0,6.0]
+double sum = va3.sum(); // 求和：21.0
+```
+
+### initializer_list（C++11）
+
+模板类`initializer_list`支持用初始化列表语法初始化容器或自定义类，统一初始化接口：
+
+```C++
+// 容器初始化
+vector<int> vec = {1,2,3};
+map<int, string> dict = {{1, "one"}, {2, "two"}};
+
+// 自定义类支持初始化列表
+class MyClass {
+private:
+    vector<int> data;
+public:
+    MyClass(initializer_list<int> il) : data(il) {}
+};
+MyClass obj = {1,2,3}; // 合法
+```
+
+# 十四、输入、输出和文件
+
+## 1. C++ 输入输出概述
+
+C++ 将输入输出抽象为 “字节流”，通过`iostream`类库管理流与程序、设备（键盘 / 屏幕 / 文件）的连接，核心依赖**流**和**缓冲区**两大概念。
+
+### 流与缓冲区
+
+- **流**：程序与设备之间的字节传输通道，分为输入流（程序从流中读取字节）和输出流（程序向流中写入字节）。流屏蔽了设备差异，使程序以统一方式处理键盘、文件等不同 I/O 源 / 目标。
+- 缓冲区：内存中的临时存储区域，用于匹配程序（逐字节处理）与设备（块传输）的速率差异，提升 I/O 效率：
+  - 输入缓冲区：存储设备输入的字节，程序从缓冲区读取数据；
+  - 输出缓冲区：存储程序输出的字节，缓冲区满或触发刷新时，数据批量写入设备。
+- 缓冲区刷新时机：
+  - 输出流遇到`\n`（仅屏幕输出）；
+  - 输入操作即将发生（如`cin`读取前）；
+  - 调用`flush()`、`endl`（刷新 + 换行）；
+  - 程序正常终止。
+
+### I/O 类体系与标准流对象
+
+`iostream`类库通过继承体系实现流管理，核心类关系如下：
+
+- `ios_base`：存储流的通用状态（如格式化标记、错误状态）；
+- `ios`：继承`ios_base`，包含指向`streambuf`（缓冲区管理类）的指针；
+- `istream`：继承`ios`，提供输入方法（如`>>`、`get()`）；
+- `ostream`：继承`ios`，提供输出方法（如`<<`、`put()`）；
+- `iostream`：多重继承`istream`和`ostream`，支持双向 I/O。
+
+C++ 自动创建 8 个标准流对象（4 个窄字符 + 4 个宽字符）：
+
+|          流对象          |   对应流   |   设备   |         特性         |
+| :----------------------: | :--------: | :------: | :------------------: |
+|          `cin`           | 标准输入流 |   键盘   |  缓冲，跳过前导空白  |
+|          `cout`          | 标准输出流 |   屏幕   |  缓冲，`\n`触发刷新  |
+|          `cerr`          | 标准错误流 |   屏幕   | 无缓冲，即时输出错误 |
+|          `clog`          | 标准错误流 |   屏幕   |  缓冲，用于日志输出  |
+| `wcin/wcout/wcerr/wclog` |  宽字符流  | 对应设备 |  处理`wchar_t`类型   |
+
+### 重定向
+
+操作系统支持标准流重定向，改变流的源 / 目标（无需修改程序）：
+
+- 输入重定向：`program < input.txt`（`cin`从文件读取）；
+- 输出重定向：`program > output.txt`（`cout`写入文件）；
+- 错误重定向（部分系统）：`program 2> error.txt`（`cerr`写入文件）。
+
+## 2. 控制台输出（cout）
+
+`cout`是`ostream`对象，支持多种格式化输出方式，核心功能包括运算符重载、成员方法、格式化控制。
+
+### 重载的`<<`运算符
+
+`<<`（插入运算符）被重载以支持所有基本类型，自动将数据转换为文本格式：
+
+```c++
+int a = 10;
+double b = 3.14;
+cout << "a=" << a << ", b=" << b << endl; // 输出：a=10, b=3.14
+```
+
+支持的类型：`char`、`int`、`double`、`char*`、`string`等，返回`ostream&`以支持链式输出。
+
+### 其他输出方法
+
+- `put(char c)`：输出单个字符，返回`ostream&`，支持链式调用：
+
+  ```c++
+  cout.put('H').put('i').put('\n'); // 输出：Hi
+  ```
+
+- `write(const char* s, streamsize n)`：输出字符串的前`n`个字符，不自动终止（即使遇到`\0`），适用于二进制数据：
+
+  ```C++
+  char str[] = "Hello";
+  cout.write(str, 3); // 输出：Hel
+  ```
+
+### 格式化输出控制
+
+通过控制符或`ios_base`成员函数调整输出格式，核心分为 5 类：
+
+#### 1. 计数系统控制（整数）
+
+- 控制符：`dec`（十进制，默认）、`hex`（十六进制）、`oct`（八进制）；
+
+- 示例：
+
+  ```c++
+  int x = 255;
+  cout << dec << x << " " << hex << x << " " << oct << x << endl;
+  // 输出：255 ff 377
+  ```
+
+#### 2. 字段宽度与填充
+
+- `width(int n)`：设置下一个输出项的字段宽度（默认右对齐），仅影响下一个输出项；
+
+- `fill(char c)`：设置字段空白部分的填充字符（默认空格）；
+
+- 示例：
+
+  ```c++
+  cout.width(10); // 字段宽度10
+  cout.fill('*'); // 填充'*'
+  cout << 123 << endl; // 输出：*******123
+  ```
+
+#### 3. 浮点数精度
+
+- `precision(int n)`：
+
+  - 默认模式：控制总有效数字（默认 6 位）；
+  - 定点 / 科学模式：控制小数位数；
+
+- 示例：
+
+  ```c++
+  double pi = 3.1415926;
+  cout.precision(4);
+  cout << pi << " " << fixed << pi << " " << scientific << pi << endl;
+  // 输出：3.142 3.1416 3.1416e+00
+  ```
+
+#### 4. 模式控制（`setf()`方法）
+
+`setf()`用于设置格式化标记，有两种原型：
+
+- `fmtflags setf(fmtflags flag)`：设置单个标记（如`showpoint`显示小数点）；
+- `fmtflags setf(fmtflags flag, fmtflags mask)`：设置一组互斥标记（如对齐方式、浮点数模式）。
+
+核心标记与功能：
+
+|              标记               |             功能             |       适用场景       |
+| :-----------------------------: | :--------------------------: | :------------------: |
+|      `ios_base::showpoint`      |    强制显示小数点和末尾 0    | 浮点数输出（如价格） |
+|       `ios_base::showpos`       |        正数前显示`+`         |     数值对比场景     |
+| `ios_base::left/right/internal` | 左对齐 / 右对齐 / 符号左对齐 |       表格输出       |
+|  `ios_base::fixed/scientific`   |    定点表示 / 科学计数法     |    浮点数格式控制    |
+
+示例（左对齐 + 显示小数点 + 精度 3）：
+
+```c++
+cout.setf(ios_base::left, ios_base::adjustfield); // 左对齐
+cout.setf(ios_base::showpoint); // 显示小数点
+cout.precision(3);
+cout << 123.45 << endl; // 输出：123.450     
+```
+
+#### 5. `iomanip`头文件控制符
+
+`iomanip`提供带参数的控制符，简化格式化代码：
+
+- `setw(int n)`：等价于`width(n)`，设置字段宽度；
+
+- `setfill(char c)`：等价于`fill(c)`，设置填充字符；
+
+- `setprecision(int n)`：等价于`precision(n)`，设置精度；
+
+- 示例：
+
+  ```c++
+  #include <iomanip>
+  cout << setw(10) << setfill('-') << left << 123 << endl;
+  // 输出：123-------
+  ```
+
+## 3. 控制台输入（cin）
+
+`cin`是`istream`对象，支持格式化输入（`>>`）和非格式化输入（`get()`、`getline()`），核心是处理输入转换和流状态。
+
+### 重载的`>>`运算符
+
+`>>`（抽取运算符）自动跳过前导空白（空格、`\n`、制表符），将输入字符转换为目标类型：
+
+```c++
+int a;
+double b;
+string s;
+cin >> a >> b >> s; // 输入：10 3.14 hello → a=10, b=3.14, s="hello"
+```
+
+支持的类型：所有基本类型、`char*`、`string`等，返回`istream&`以支持链式输入。
+
+#### 输入匹配与流状态
+
+若输入与目标类型不匹配（如输入字母给`int`变量），`cin`会设置**流状态位**，后续输入操作被阻塞。流状态由`iostate`类型（bitmask）管理，核心状态位：
+
+|  状态位   |                  含义                   |   检测方法   |
+| :-------: | :-------------------------------------: | :----------: |
+| `eofbit`  | 到达文件尾（或键盘模拟`Ctrl+Z/Ctrl+D`） | `cin.eof()`  |
+| `badbit`  |         流被破坏（如硬件故障）          | `cin.bad()`  |
+| `failbit` |       输入匹配失败或 I/O 操作失败       | `cin.fail()` |
+| `goodbit` |          无错误（所有位为 0）           | `cin.good()` |
+
+#### 流状态重置与错误处理
+
+输入失败后需重置状态并清理输入缓冲区：
+
+```c++
+int num;
+while (!(cin >> num)) { // 输入非整数时进入循环
+    cin.clear(); // 重置流状态（清除failbit）
+    while (!isspace(cin.get())) { // 跳过无效字符
+        continue;
+    }
+    cout << "请输入整数：";
+}
+```
+
+### 非格式化输入方法
+
+`cin`提供低级别输入方法，不跳过空白、不进行类型转换，适用于精细控制输入：
+
+#### 1. 单字符输入
+
+- `cin.get(char& ch)`：读取下一个字符（包括空白），存入`ch`，返回`istream&`；
+
+- `cin.get()`：读取下一个字符，返回`int`（字符 ASCII 码或`EOF`）；
+
+- 示例（读取包括空格的字符）：
+
+  ```c++
+  char ch;
+  while (cin.get(ch) && ch != '\n') { // 读取一行（包括空格）
+      cout << ch;
+  }
+  ```
+
+#### 2. 字符串输入
+
+- `cin.get(char* buf, int n, char delim='\n')`：读取最多`n-1`个字符，遇到`delim`或达到长度停止，`delim`留在输入缓冲区；
+
+- `cin.getline(char* buf, int n, char delim='\n')`：与`get()`类似，但`delim`被丢弃；
+
+- 示例（读取带空格的字符串）：
+
+  ```c++
+  char buf[100];
+  cin.getline(buf, 100, '#'); // 以'#'为分隔符，读取到'#'或99个字符
+  ```
+
+#### 3. 其他辅助方法
+
+- `cin.ignore(int n=1, int delim=EOF)`：跳过最多`n`个字符，或直到`delim`；
+
+  ```c++
+  cin.ignore(100, '\n'); // 跳过当前行剩余字符
+  ```
+
+- `cin.peek()`：返回下一个字符，但不从缓冲区移除；
+
+- `cin.putback(char ch)`：将字符放回输入缓冲区，成为下一个读取字符；
+
+- `cin.gcount()`：返回最后一次非格式化输入读取的字符数。
+
+## 4. 文件 I/O
+
+文件 I/O 通过`fstream`类库实现，`ifstream`（输入）、`ofstream`（输出）、`fstream`（双向）继承自控制台 I/O 类，用法与`cin/cout`一致，仅需额外关联文件。
+
+### 文件 I/O 基本流程
+
+1. 包含头文件`<fstream>`；
+2. 创建文件流对象（`ifstream/ofstream/fstream`）；
+3. 关联文件（通过构造函数或`open()`方法）；
+4. 检查文件是否成功打开（`is_open()`）；
+5. 读写文件（使用`>>`、`<<`、`get()`、`write()`等方法）；
+6. 关闭文件（`close()`，自动刷新缓冲区，可选，对象销毁时自动关闭）。
+
+#### 示例（文件写入与读取）
+
+```c++
+#include <fstream>
+#include <string>
+using namespace std;
+
+int main() {
+    // 1. 写入文件
+    ofstream fout("test.txt"); // 创建对象并关联文件
+    if (!fout.is_open()) { // 检查打开成功
+        cerr << "文件打开失败" << endl;
+        return 1;
+    }
+    fout << "Hello File!" << endl;
+    fout.close(); // 关闭文件
+
+    // 2. 读取文件
+    ifstream fin("test.txt");
+    if (!fin.is_open()) {
+        cerr << "文件打开失败" << endl;
+        return 1;
+    }
+    string line;
+    while (getline(fin, line)) { // 逐行读取
+        cout << line << endl; // 输出：Hello File!
+    }
+    fin.close();
+    return 0;
+}
+```
+
+### 文件模式
+
+关联文件时需指定文件模式，控制文件的打开方式（如读 / 写、创建 / 截断），通过`open()`的第二个参数或构造函数指定。核心模式常量（`ios_base`定义）：
+
+|      模式常量      |            含义            |            适用流             |
+| :----------------: | :------------------------: | :---------------------------: |
+|   `ios_base::in`   |          只读模式          | `ifstream`（默认）、`fstream` |
+|  `ios_base::out`   |          只写模式          | `ofstream`（默认）、`fstream` |
+|  `ios_base::app`   |   追加模式（写在文件尾）   |     `ofstream`、`fstream`     |
+| `ios_base::trunc`  | 截断模式（文件存在则清空） | `ofstream`（默认）、`fstream` |
+|  `ios_base::ate`   |     打开后定位到文件尾     |          所有文件流           |
+| `ios_base::binary` | 二进制模式（不转换换行符） |          所有文件流           |
+
+#### 模式组合（用`|`连接）
+
+- 读 + 写：`ios_base::in | ios_base::out`（`fstream`）；
+- 追加 + 二进制：`ios_base::out | ios_base::app | ios_base::binary`；
+- 注意：`ios_base::out`默认包含`ios_base::trunc`，若需保留文件内容，需结合`app`或`in`。
+
+### 文本文件与二进制文件
+
+#### 1. 文本文件
+
+- 数据以字符格式存储（数字转换为文本），支持人类阅读；
+- 读写用`>>`、`<<`、`getline()`等格式化方法；
+- 跨平台注意：Windows 换行符为`\r\n`，Linux 为`\n`，文本模式下系统自动转换，二进制模式不转换。
+
+#### 2. 二进制文件
+
+- 数据以内存中的二进制格式存储（如`int`的 4 字节、`double`的 8 字节），紧凑且精确；
+
+- 读写用`read()`和`write()`方法，需强制转换指针为`char*`；
+
+- 示例（存储 / 读取结构）：
+
+  ```c++
+  struct Person {
+      char name[20];
+      int age;
+  };
+  
+  // 写入
+  Person p = {"Alice", 25};
+  ofstream fout("person.dat", ios_base::out | ios_base::binary);
+  fout.write((char*)&p, sizeof(p)); // 写入整个结构
+  
+  // 读取
+  Person p2;
+  ifstream fin("person.dat", ios_base::in | ios_base::binary);
+  fin.read((char*)&p2, sizeof(p2)); // 读取整个结构
+  ```
+
+- 注意：二进制文件不可移植（不同系统 / 编译器的内存布局可能不同），且不能用文本编辑器打开。
+
+### 随机文件存取
+
+随机存取指直接定位到文件任意位置（非顺序读写），依赖文件流的定位方法，仅适用于二进制文件（记录长度固定）。
+
+#### 定位方法
+
+- `seekg(pos_type pos)`：输入指针定位到绝对位置（从文件开头算起）；
+- `seekg(off_type off, ios_base::seekdir dir)`：输入指针相对定位：
+  - `ios_base::beg`：相对文件开头；
+  - `ios_base::cur`：相对当前位置；
+  - `ios_base::end`：相对文件尾；
+- `seekp(...)`：输出指针定位（`fstream`需同步输入输出指针）；
+- `tellg()`：返回输入指针当前位置（字节数）；
+- `tellp()`：返回输出指针当前位置。
+
+#### 示例（修改文件中的特定记录）
+
+假设`person.dat`存储多个`Person`结构（每个记录大小`sizeof(Person)`），修改第 2 条记录：
+
+```c++
+fstream finout("person.dat", ios_base::in | ios_base::out | ios_base::binary);
+if (!finout.is_open()) return 1;
+
+int recordNum = 1; // 第2条记录（索引从0开始）
+streampos pos = recordNum * sizeof(Person); // 计算位置
+finout.seekg(pos); // 定位到该记录
+
+Person p = {"Bob", 30};
+finout.write((char*)&p, sizeof(p)); // 覆盖该记录
+finout.close();
+```
+
+### 命令行参数
+
+程序可通过`main()`的参数获取命令行输入的文件名等信息，原型：
+
+```c++
+int main(int argc, char* argv[])
+```
+
+- `argc`：命令行参数个数（包含程序名）；
+- `argv`：字符串指针数组，`argv[0]`为程序名，`argv[1]`及以后为参数。
+
+示例（统计命令行指定文件的字符数）：
+
+```c++
+#include <fstream>
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        cerr << "用法：" << argv[0] << " 文件名" << endl;
+        return 1;
+    }
+    ifstream fin(argv[1]);
+    if (!fin.is_open()) {
+        cerr << "无法打开文件：" << argv[1] << endl;
+        return 1;
+    }
+    int count = 0;
+    char ch;
+    while (fin.get(ch)) count++;
+    cout << "字符数：" << count << endl;
+    return 0;
+}
+```
+
+## 5. 内核格式化
+
+`sstream`头文件提供字符串流类，支持将字符串作为流进行格式化 I/O（内存中的 I/O），核心类：
+
+- `ostringstream`：将格式化数据写入字符串；
+- `istringstream`：从字符串读取格式化数据。
+
+### ostringstream（字符串输出流）
+
+用于将多种类型数据格式化为字符串，避免手动拼接：
+
+```c++
+#include <sstream>
+#include <string>
+
+int main() {
+    ostringstream oss;
+    int a = 10;
+    double b = 3.14;
+    oss << "a=" << a << ", b=" << b; // 格式化写入流
+    string result = oss.str(); // 提取字符串："a=10, b=3.14"
+    cout << result << endl;
+    return 0;
+}
+```
+
+### istringstream（字符串输入流）
+
+用于从字符串中读取格式化数据，自动转换类型：
+
+```c++
+#include <sstream>
+#include <string>
+
+int main() {
+    string str = "10 3.14 hello";
+    istringstream iss(str);
+    int a;
+    double b;
+    string s;
+    iss >> a >> b >> s; // 从字符串读取：a=10, b=3.14, s="hello"
+    cout << a << " " << b << " " << s << endl;
+    return 0;
+}
+```
+
+### 应用场景
+
+- 格式化复杂字符串（如日志、网络消息）；
+- 解析配置文件或用户输入的结构化数据；
+- 避免`sprintf`的缓冲区溢出风险。
+
+# 十五、C++11 新标准
+
+## 1. 复习 C++11 已有核心特性
+
+### 新类型与字符串
+
+- **新增基本类型**：`long long`（64 位整型）、`unsigned long long`、`char16_t`（16 位字符）、`char32_t`（32 位字符），满足更大数值范围和多字符集需求；
+
+- 原始字符串：使用`R"(字符串内容)"`语法，避免转义字符的繁琐处理，例如：
+
+  ```c++
+  string raw = R"(C:\Program Files\test.txt)"; // 无需转义'\'
+  ```
+
+### 统一初始化
+
+- 语法：使用大括号`{}`进行初始化，适用于内置类型、自定义类、数组、new 表达式等，可省略`=`：
+
+  ```c++
+  int x{5};                  // 内置类型
+  double y = {2.75};         // 带=的形式
+  int* arr = new int[4]{2,4,6,7}; // new表达式
+  class Stump {
+      int roots;
+      double weight;
+  public:
+      Stump(int r, double w) : roots(r), weight(w) {}
+  };
+  Stump s3{4, 32.1}; // 类对象初始化
+  ```
+
+- **核心优势**：防止缩窄转换（禁止将大类型赋值给小类型，如`char c{1000}`编译报错），仅允许安全转换（如`char c{66}`、`double d{66}`）；
+
+- initializer_list 模板：用于接收初始化列表参数，STL 容器已支持，例如：
+
+  ```c++
+  vector<int> v{1,2,3}; // 直接用列表初始化容器
+  // 自定义类支持初始化列表
+  class MyClass {
+  public:
+      MyClass(initializer_list<int> il) { /* 处理列表元素 */ }
+  };
+  MyClass obj{10,20,30};
+  ```
+
+### 简化声明的关键字
+
+#### 1. auto（自动类型推断）
+
+- 根据初始化值自动推导变量类型，简化复杂类型声明（如迭代器、模板类型）：
+
+  ```c++
+  auto num = 10; // int类型
+  auto pt = &num; // int*类型
+  vector<string> vec;
+  auto it = vec.begin(); // 迭代器类型vector<string>::iterator
+  ```
+
+#### 2. decltype（类型推导）
+
+- 根据表达式推导变量类型，适用于模板中类型不确定的场景：
+
+  ```c++
+  double x = 3.14;
+  int n = 10;
+  decltype(x*n) res; // res类型为double（x*n的类型）
+  decltype(&x) p;    // p类型为double*
+  ```
+
+#### 3. 返回类型后置
+
+- 用于模板函数中，在参数列表后指定返回类型，解决模板参数作用域问题：
+
+  ```c++
+  template<typename T, typename U>
+  auto add(T t, U u) -> decltype(t+u) { // 返回t+u的类型
+      return t + u;
+  }
+  ```
+
+#### 4. 模板别名（using =）
+
+- 替代 typedef，支持模板部分具体化，更灵活：
+
+  ```c++
+  // 传统typedef
+  typedef vector<string>::iterator VecIt;
+  // C++11 using
+  using VecIt = vector<string>::iterator;
+  // 模板别名（typedef无法实现）
+  template<typename T>
+  using Arr12 = array<T, 12>; // 固定大小为12的数组模板
+  Arr12<double> arr; // 等价于array<double,12>
+  ```
+
+#### 5. nullptr（空指针常量）
+
+- 专门表示空指针，类型安全，避免 0 既表示整数又表示指针的歧义：
+
+  ```c++
+  int* p = nullptr; // 正确，指针类型
+  // int a = nullptr; // 编译错误，不能转换为整型
+  ```
+
+### 智能指针升级
+
+- 摒弃`auto_ptr`，新增`unique_ptr`（独占所有权）、`shared_ptr`（共享所有权）、`weak_ptr`（解决循环引用），支持 STL 容器和移动语义
+
+### 异常规范修改
+
+- 摒弃旧版异常规范（如`throw(bad_dog)`），新增`noexcept`关键字表示函数不抛出异常：
+
+  ```c++
+  void func() noexcept; // 明确声明不抛出异常
+  ```
+
+### 作用域内枚举（强类型枚举）
+
+- 用`enum class`或`enum struct`定义，解决传统枚举的作用域污染和类型不安全问题：
+
+  ```c++
+  enum class Color { Red, Green, Blue }; // 作用域限定
+  enum struct Size { Small, Medium, Large };
+  Color c = Color::Red; // 必须显式指定作用域
+  // Size s = Color::Red; // 编译错误，类型不兼容
+  ```
+
+### 类的修改
+
+#### 1. 显式转换运算符（explicit）
+
+- 拓展`explicit`的用途，禁止类的隐式转换运算符：
+
+  ```c++
+  class MyInt {
+  public:
+      explicit operator int() const { return val; } // 禁止隐式转换为int
+  };
+  MyInt mi(10);
+  // int a = mi; // 编译错误，需显式转换
+  int a = static_cast<int>(mi); // 正确
+  ```
+
+#### 2. 类内成员初始化
+
+- 直接在类定义中初始化成员，避免构造函数重复初始化代码：
+
+  ```c++
+  class Session {
+      int mem1 = 10;        // 类内初始化
+      double mem2{1966.54}; // 大括号形式
+      short mem3;
+  public:
+      Session() {} // 自动使用类内初始化值
+      Session(short s) : mem3(s) {} // 仅初始化mem3，mem1、mem2用默认值
+  };
+  ```
+
+### 模板和 STL 的修改
+
+#### 1. 基于范围的 for 循环
+
+- 简化数组、STL 容器的遍历，无需手动管理迭代器：
+
+  ```c++
+  double prices[5] = {4.99, 10.99, 6.87, 7.99, 8.49};
+  for (double x : prices) cout << x << endl; // 遍历数组
+  vector<int> vec = {1,2,3};
+  for (auto& x : vec) x *= 2; // 引用修改容器元
+  ```
+
+#### 2. 新 STL 容器
+
+- `forward_list`：单向链表，节省空间，仅支持单向遍历；
+- 无序容器：`unordered_map`、`unordered_multimap`、`unordered_set`、`unordered_multiset`，基于哈希表实现，查找效率 O (1)；
+- `array`：固定大小数组模板，结合数组和容器的优点，支持 STL 算法。
+
+#### 3. 新 STL 方法
+
+- `cbegin()`/`cend()`：返回 const 迭代器，确保不能修改元素；
+- `crbegin()`/`crend()`：const 反向迭代器；
+- STL 容器新增移动构造函数和移动赋值运算符，支持移动语义。
+
+#### 4. 其他修改
+
+- `valarray`支持`begin()`/`end()`，可使用 STL 算法；
+- 嵌套模板的尖括号无需空格（如`vector<list<int>>`合法，无需写成`vector<list<int> >`）。
+
+### 右值引用
+
+- 语法：用`&&`表示，专门关联右值（字面量、表达式结果、临时对象）：
+
+  ```c++
+  int x = 10, y = 23;
+  int&& r1 = 13;    // 字面量（右值）
+  int&& r2 = x + y; // 表达式结果（右值）
+  ```
+
+- 核心用途：支持移动语义，避免深拷贝开销
+
+## 2. 移动语义和右值引用
+
+### 为什么需要移动语义？
+
+- 传统深拷贝问题：当对象包含动态内存时（如`vector`、`string`），拷贝构造函数会复制所有数据，开销巨大。例如：
+
+  ```c++
+  vector<string> allcaps(const vector<string>& vs) {
+      vector<string> temp;
+      // 处理temp，填充大量数据
+      return temp; // 返回临时对象
+  }
+  vector<string> vstr_copy = allcaps(vstr); // 深拷贝temp的数据，之后temp被销毁
+  ```
+
+- 移动语义的核心思想：不复制数据，而是将临时对象的资源（动态内存）“转移” 给目标对象，如同文件 “移动” 只是修改路径，而非复制文件内容，大幅提升效率。
+
+### 移动构造函数与移动赋值运算符
+
+#### 1. 移动构造函数
+
+- 语法：参数为非 const 右值引用（因需修改源对象，释放其资源），实现资源转移：
+
+  ```c++
+  class Useless {
+  private:
+      int n;
+      char* pc; // 动态内存
+  public:
+      // 复制构造函数（深拷贝）
+      Useless(const Useless& f) : n(f.n) {
+          pc = new char[n];
+          memcpy(pc, f.pc, n);
+      }
+      // 移动构造函数（资源转移）
+      Useless(Useless&& f) : n(f.n), pc(f.pc) {
+          f.n = 0;     // 源对象置空
+          f.pc = nullptr; // 避免源对象析构时释放资源
+      }
+      ~Useless() { delete[] pc; }
+  };
+  ```
+
+#### 2. 移动赋值运算符
+
+- 语法类似移动构造函数，需先释放目标对象自身资源，再转移源对象资源：
+
+  ```c++
+  Useless& operator=(Useless&& f) {
+      if (this == &f) return *this;
+      delete[] pc; // 释放当前对象资源
+      n = f.n;
+      pc = f.pc;   // 转移源对象资源
+      f.n = 0;
+      f.pc = nullptr;
+      return *this;
+  }
+  ```
+
+#### 3. 调用时机
+
+- 当实参为右值（临时对象、表达式结果等）时，调用移动构造 / 赋值；
+- 当实参为左值（变量、具名对象）时，调用复制构造 / 赋值。
+
+### 强制移动：std::move
+
+- `std::move`函数将左值转换为右值，强制触发移动语义（头文件`<utility>`）：
+
+  ```c++
+  Useless one(10, 'x');
+  Useless two = std::move(one); // 强制调用移动构造函数
+  // one此时为空，资源已转移给two
+  ```
+
+- 注意：`std::move`仅转换类型，不实际移动数据；转移后源对象状态不确定，不应再使用（除赋值或销毁外）。
+
+## 3. 新的类功能
+
+### 特殊成员函数扩展
+
+|  特殊成员函数  |      用途      |        编译器默认生成条件         |
+| :------------: | :------------: | :-------------------------------: |
+|  默认构造函数  | 无参初始化对象 |        未定义任何构造函数         |
+|  复制构造函数  | 左值初始化对象 | 未定义移动构造 / 赋值，且程序需要 |
+| 复制赋值运算符 |    左值赋值    | 未定义移动构造 / 赋值，且程序需要 |
+|  移动构造函数  | 右值初始化对象 | 未定义复制构造 / 赋值，且程序需要 |
+| 移动赋值运算符 |    右值赋值    | 未定义复制构造 / 赋值，且程序需要 |
+|    析构函数    |    释放资源    |            未显式定义             |
+
+### 默认和禁用方法
+
+#### 1. default：显式要求编译器生成默认版本
+
+- 当手动定义了某些特殊成员函数，编译器不再自动生成其他版本时，可用`default`强制生成：
+
+  ```c++
+  class Someclass {
+  public:
+      Someclass() = default; // 编译器生成默认构造函数
+      Someclass(Someclass&&) = default; // 生成默认移动构造函数
+  };
+  ```
+
+#### 2. delete：禁用特定方法
+
+- 禁止编译器生成默认版本（如禁止复制对象），比将方法设为 private 更清晰：
+
+  ```c++
+  class NonCopyable {
+  public:
+      NonCopyable() = default;
+      NonCopyable(const NonCopyable&) = delete; // 禁用复制构造
+      NonCopyable& operator=(const NonCopyable&) = delete; // 禁用复制赋值
+  };
+  NonCopyable a;
+  // NonCopyable b = a; // 编译错误，复制被禁用
+  ```
+
+- 也可禁用特定参数的函数（如禁止 int 到 double 的隐式转换）：
+
+  ```c++
+  class Someclass {
+  public:
+      void redo(double) {}
+      void redo(int) = delete; // 禁用int参数版本
+  };
+  Someclass sc;
+  // sc.redo(5); // 编译错误，int版本被禁用
+  sc.redo(5.0); // 正确
+  ```
+
+### 委托构造函数
+
+- 一个构造函数调用同一类的另一个构造函数，避免代码重复：
+
+  ```c++
+  class MyClass {
+      int x, y;
+  public:
+      MyClass(int a, int b) : x(a), y(b) {} // 目标构造函数
+      MyClass() : MyClass(0, 0) {} // 委托给MyClass(int, int)
+      MyClass(int a) : MyClass(a, 10) {} // 委托给MyClass(int, int)
+  };
+  ```
+
+### 继承构造函数
+
+- 派生类继承基类的构造函数（默认 / 复制 / 移动构造除外），用`using 基类::构造函数`声明：
+
+  ```c++
+  class Base {
+  public:
+      Base(int a) {}
+      Base(double b, int c) {}
+  };
+  class Derived : public Base {
+  public:
+      using Base::Base; // 继承Base的所有构造函数
+      Derived(const string& s) {} // 派生类自定义构造函数
+  };
+  Derived d1(10); // 调用Base(int)
+  Derived d2(3.14, 5); // 调用Base(double, int)
+  ```
+
+### 虚方法管理：override 和 final
+
+#### 1. override：显式声明覆盖基类虚方法
+
+- 确保派生类方法与基类虚方法原型一致，否则编译报错：
+
+  ```c++
+  class Base {
+  public:
+      virtual void func(char ch) const {}
+  };
+  class Derived : public Base {
+  public:
+      // void func(char* ch) const override {} // 编译错误，参数类型不匹配
+      void func(char ch) const override {} // 正确覆盖
+  };
+  ```
+
+#### 2. final：禁止派生类覆盖虚方法
+
+- 基类虚方法加`final`，派生类无法重写该方法；类加`final`，无法被继承：
+
+  ```c++
+  class Base {
+  public:
+      virtual void func() const final {} // 禁止覆盖
+  };
+  class Derived : public Base {
+  public:
+      // void func() const {} // 编译错误，无法覆盖final方法
+  };
+  class FinalClass final {}; // 禁止继承
+  // class Sub : public FinalClass {}; // 编译错误
+  ```
+
+## 4. Lambda 表达式（匿名函数）
+
+### 为什么需要 Lambda？
+
+解决函数指针、函数符的局限性：函数指针无法捕获局部变量，函数符需要单独定义类；Lambda 可直接在使用处定义匿名函数，支持捕获局部变量，结合 STL 算法使用更简洁。
+
+### Lambda 语法
+
+```c++
+[capture-list](parameter-list) -> return-type { function-body }
+```
+
+- **捕获列表**：指定要捕获的局部变量及其捕获方式（值捕获、引用捕获）；
+- **参数列表**：与普通函数参数列表类似，可省略（无参数时）；
+- **返回类型**：可省略，编译器自动推导（仅当函数体为单一 return 语句时）；
+- **函数体**：函数逻辑实现。
+
+#### 捕获列表详解
+
+|     捕获方式     |     语法     |                      说明                      |
+| :--------------: | :----------: | :--------------------------------------------: |
+|      值捕获      |    [var]     | 捕获 var，按值访问（不可修改，除非加 mutable） |
+|     引用捕获     |    [&var]    |      捕获 var，按引用访问（可修改原变量）      |
+| 捕获所有局部变量 |     [=]      |                所有变量按值捕获                |
+| 捕获所有局部变量 |     [&]      |               所有变量按引用捕获               |
+|     混合捕获     | [var, &var2] |           var 值捕获，var2 引用捕获            |
+|     混合捕获     |  [=, &var]   |            默认值捕获，var 引用捕获            |
+
+### 示例：Lambda 与 STL 算法
+
+```c++
+#include <vector>
+#include <algorithm>
+#include <iostream>
+
+int main() {
+    vector<int> nums = {1,2,3,4,5,6,7,8,9,10};
+    int count3 = 0, count13 = 0;
+
+    // 统计能被3整除的数（无捕获，直接使用参数）
+    count3 = count_if(nums.begin(), nums.end(),
+                     [](int x) { return x % 3 == 0; });
+
+    // 统计能被13整除的数（引用捕获count13）
+    for_each(nums.begin(), nums.end(),
+             [&count13](int x) { count13 += (x % 13 == 0); });
+
+    // 同时统计能被3和13整除的数（捕获所有局部变量）
+    count3 = 0; count13 = 0;
+    for_each(nums.begin(), nums.end(),
+             [&](int x) {
+                 count3 += (x % 3 == 0);
+                 count13 += (x % 13 == 0);
+             });
+
+    cout << "能被3整除：" << count3 << endl;
+    cout << "能被13整除：" << count13 << endl;
+    return 0;
+}
+```
+
+### 有名称的 Lambda
+
+- 可将 Lambda 赋值给变量，重复使用：
+
+  ```c++
+  auto mod3 = [](int x) { return x % 3 == 0; };
+  int count1 = count_if(nums.begin(), nums.end(), mod3);
+  int count2 = count_if(another_nums.begin(), another_nums.end(), mod3);
+  ```
+
+## 5. 包装器（function 模板）
+
+### 问题背景
+
+函数指针、函数符、Lambda 属于不同类型，即使调用特征标相同，如`double(double)`，也会导致模板多次实例化，增加代码体积：
+
+```c++
+template<typename T, typename F>
+T use_f(T v, F f) {
+    static int count = 0;
+    count++;
+    return f(v);
+}
+// 以下调用会生成多个use_f实例
+use_f(2.0, dub);          // F为函数指针类型
+use_f(2.0, Fp(5.0));     // F为函数符类型
+use_f(2.0, [](double x) { return x*x; }); // F为Lambda类型
+```
+
+### function 模板的作用
+
+- 统一各种可调用对象的类型（函数指针、函数符、Lambda），只要调用特征标相同，就视为同一类型，减少模板实例化次数。
+
+### 语法与示例
+
+- 头文件`<functional>`，声明格式：`function<返回类型(参数类型列表)>`
+
+  ```c++
+  #include <functional>
+  
+  double dub(double x) { return 2.0*x; }
+  class Fp {
+  private:
+      double z;
+  public:
+      Fp(double z) : z(z) {}
+      double operator()(double x) { return z*x; }
+  };
+  
+  int main() {
+      function<double(double)> f1 = dub;          // 包装函数指针
+      function<double(double)> f2 = Fp(5.0);     // 包装函数符
+      function<double(double)> f3 = [](double x) { return x*x; }; // 包装Lambda
+  
+      // 模板仅实例化一次
+      cout << use_f(2.0, f1) << endl;
+      cout << use_f(2.0, f2) << endl;
+      cout << use_f(2.0, f3) << endl;
+      return 0;
+  }
+  ```
+
+## 6. 可变参数模板
+
+### 核心概念
+
+- **模板参数包**：用`typename... Args`表示，接收可变数量的模板参数；
+- **函数参数包**：用`Args... args`表示，接收可变数量的函数参数；
+- **展开参数包**：用`args...`展开参数包，通常结合递归实现可变参数处理。
+
+### 示例：实现可变参数打印函数
+
+```c++
+#include <iostream>
+#include <string>
+
+// 终止条件：无参数时调用
+void show_list() {}
+
+// 递归函数：处理第一个参数，递归处理剩余参数
+template<typename T, typename... Args>
+void show_list(const T& value, const Args&... args) {
+    cout << value;
+    if (sizeof...(args) > 0) { // 判断是否还有剩余参数
+        cout << ", ";
+    }
+    show_list(args...); // 展开参数包，递归调用
+}
+
+int main() {
+    show_list(14, 2.71828, "hello", string("world"));
+    // 输出：14, 2.71828, hello, world
+    return 0;
+}
+```
+
+- `sizeof...(args)`：获取参数包中参数的个数；
+- 递归终止条件：必须定义无参数版本的`show_list()`，否则递归会无限进行。
+
+## 7. C++11 其他新增功能
+
+### 并行编程支持
+
+- **内存模型**：定义多线程内存访问规则；
+- **关键字**：`thread_local`（线程局部存储，变量生命周期与线程一致）；
+- **库支持**：`<atomic>`（原子操作）、`<thread>`（线程管理）、`<mutex>`（互斥锁）、`<condition_variable>`（条件变量）。
+
+### 新增库
+
+- `<random>`：可扩展随机数库，支持多种分布（均匀分布、正态分布等）；
+- `<chrono>`：时间库，处理时间间隔和时间点；
+- `<tuple>`：元组模板，存储不同类型的值（如`tuple<int, string, double>`）；
+- `<regex>`：正则表达式库，支持模式匹配、替换等操作；
+- `<ratio>`：编译期有理数算术库，准确表示分数。
+
+### 低级编程支持
+
+- **POD 类型放松**：允许 POD 类型有默认构造函数、成员初始化等，仍支持逐字节复制；
+- **共用体增强**：成员可有构造函数和析构函数；
+- **内存对齐**：`alignof()`（获取类型对齐要求）、`alignas`（指定对齐方式）；
+- **constexpr**：编译期计算常量表达式，可用于数组大小、模板参数等。
+
+### 杂项特性
+
+- **用户自定义字面量**：通过字面量运算符定义自定义字面量（如`1001001b`表示二进制数）；
+- **static_assert**：编译期断言，用于模板调试（如`static_assert(sizeof(int) == 4, "int must be 4 bytes")`）；
+- **元编程支持**：增强模板编译期计算能力。
+
+## 8. Boost 库与 C++ 标准
+
+- **Boost 项目**：开源 C++ 库集合，很多特性被纳入 C++11（如智能指针、function、tuple 等）；
+- **TR1（Technical Report 1）**：C++98 的库扩展草案，大部分来自 Boost，后融入 C++11；
+- 常用 Boost 库：
+  - `lexical_cast`：数值与字符串转换（`boost::lexical_cast<string>(123)`）；
+  - `Any`：存储任意类型的值；
+  - `Filesystem`：跨平台文件系统操作。
